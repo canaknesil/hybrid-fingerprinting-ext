@@ -34,8 +34,12 @@ TARGET = simpleserial-aes
 
 # List C source files here.
 # Header files (.h) are automatically pulled in.
-#CPPSRC += simpleserial-aes.cpp
-SRC += simpleserial-aes.c
+CPPSRC += simpleserial-aes.cpp
+#SRC += simpleserial-aes.c
+
+# In Makefile.xmega CXX is not defined, causing regular g++ to be
+# invoked, that cannot compile for AVR microcontrollers.
+CXX = avr-g++
 
 # -----------------------------------------------------------------------------
 EXTRA_OPTS = NO_EXTRA_OPTS
