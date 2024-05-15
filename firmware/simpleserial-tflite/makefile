@@ -1,0 +1,65 @@
+# Hey Emacs, this is a -*- makefile -*-
+#----------------------------------------------------------------------------
+#
+# Makefile for ChipWhisperer SimpleSerial-AES Program
+#
+#----------------------------------------------------------------------------
+# On command line:
+#
+# make all = Make software.
+#
+# make clean = Clean out built project files.
+#
+# make coff = Convert ELF to AVR COFF.
+#
+# make extcoff = Convert ELF to AVR Extended COFF.
+#
+# make program = Download the hex file to the device, using avrdude.
+#                Please customize the avrdude settings below first!
+#
+# make debug = Start either simulavr or avarice as specified for debugging,
+#              with avr-gdb or avr-insight as the front end for debugging.
+#
+# make filename.s = Just compile filename.c into the assembler code only.
+#
+# make filename.i = Create a preprocessed source file for use in submitting
+#                   bug reports to the GCC project.
+#
+# To rebuild project do "make clean" then "make all".
+#----------------------------------------------------------------------------
+
+# Target file name (without extension).
+# This is the base name of the compiled .hex file.
+TARGET = simpleserial-tflite
+
+# List C source files here.
+# Header files (.h) are automatically pulled in.
+CPPSRC += simpleserial-tflite.cpp
+#SRC += simpleserial-aes.c
+
+# In Makefile.xmega CXX is not defined, causing regular g++ to be
+# invoked, that cannot compile for AVR microcontrollers.
+CXX = avr-g++
+
+# -----------------------------------------------------------------------------
+EXTRA_OPTS = NO_EXTRA_OPTS
+CFLAGS += -D$(EXTRA_OPTS)
+
+
+# ifeq ($(CRYPTO_TARGET),)
+#   ${info No CRYPTO_TARGET passed - defaulting to TINYAES128C}
+#   CRYPTO_TARGET = TINYAES128C
+# endif
+CRYPTO_TARGET = TINYAES128C
+PLATFORM = CWLITEXMEGA
+
+${info Building for platform ${PLATFORM} with CRYPTO_TARGET=$(CRYPTO_TARGET)}
+
+FIRMWAREPATH = ${HOME}/Programs/chipwhisperer/hardware/victims/firmware
+
+# Add simpleserial project to build
+include $(FIRMWAREPATH)/simpleserial/Makefile.simpleserial
+
+
+include $(FIRMWAREPATH)/Makefile.inc
+

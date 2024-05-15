@@ -1,0 +1,9 @@
+/.dep
+/objdir*
+/*.bin
+/*.eep
+/*.elf
+/*.hex
+/*.lss
+/*.map
+/*.sym
