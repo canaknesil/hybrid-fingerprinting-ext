@@ -77,7 +77,7 @@ def ss_write(c, payload=[], timeout=2000):
     if ret is None:
         raise Exception("Target failed to acknowledge!")
 
-    #print(" -> {}".format(ret))
+    return ret
 
     
 def ss_read(c, payload_len, timeout=2000):
@@ -95,6 +95,9 @@ def ss_read(c, payload_len, timeout=2000):
 #
 # SEND MODEL
 #
+
+if ss_write('g') != 0:
+    raise Exception("Model memory allocation unsuccessful!")
 
 model = bytearray([1, 2] * 32 + [3, 4] * 30)
 

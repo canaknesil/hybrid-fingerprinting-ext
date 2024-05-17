@@ -74,7 +74,7 @@ extern "C" {
 // time. Receiving the models in 64 byte chunks.
 
 // For now using the main memory for the model for testing.
-static uint8_t model[128];
+static uint8_t *model;
 
 static size_t model_write_addr_offset = 0;
 static size_t model_read_addr_offset = 0;
@@ -105,6 +105,14 @@ static uint8_t put_model_64(uint8_t* data, uint8_t len)
    model_read_addr_offset += 64;
    
    return 0x00;
+}
+
+static uint8_t check_model_ptr(uint8_t* data, uint8_t len)
+{
+   if (model == 0)
+      return 0x01;
+   else
+      return 0x00;
 }
 
 
@@ -141,6 +149,10 @@ int main(void)
    simpleserial_addcmd('b', 64, get_model_64);
    simpleserial_addcmd('c', 0, put_model_reset);
    simpleserial_addcmd('d', 0, put_model_64);
+
+   simpleserial_addcmd('g', 0, check_model_ptr);
+
+   model = (uint8_t *) malloc(1000 * sizeof(uint8_t));
 
    while(1)
       simpleserial_get();
