@@ -58,6 +58,7 @@ ${info Building for platform ${PLATFORM} with CRYPTO_TARGET=$(CRYPTO_TARGET)}
 FIRMWAREPATH = ${HOME}/Programs/chipwhisperer/hardware/victims/firmware
 
 # Add simpleserial project to build
+SS_VER = SS_VER_1_1
 include $(FIRMWAREPATH)/simpleserial/Makefile.simpleserial
 
 
