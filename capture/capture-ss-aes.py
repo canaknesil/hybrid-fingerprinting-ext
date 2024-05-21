@@ -4,7 +4,8 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 
-PLATFORM = "CWLITEXMEGA"
+#PLATFORM = "CWLITEXMEGA"
+PLATFORM = "CW308_STM32F4"
 fw_path = '../firmware/simpleserial-aes/simpleserial-aes-{}.hex'.format(PLATFORM)
 
 print("PLATFORM: ", PLATFORM)

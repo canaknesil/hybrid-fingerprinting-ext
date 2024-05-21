@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 import sys
 
 
-PLATFORM = "CWLITEXMEGA"
+#PLATFORM = "CWLITEXMEGA"
+PLATFORM = "CW308_STM32F4"
 fw_path = '../firmware/simpleserial-tflite/simpleserial-tflite-{}.hex'.format(PLATFORM)
 
 print("PLATFORM: ", PLATFORM)

@@ -28,6 +28,10 @@
 # To rebuild project do "make clean" then "make all".
 #----------------------------------------------------------------------------
 
+
+# To change the target platform, modify PLATFORM and CXX.
+
+
 # Target file name (without extension).
 # This is the base name of the compiled .hex file.
 TARGET = simpleserial-tflite
@@ -39,7 +43,8 @@ CPPSRC += simpleserial-tflite.cpp
 
 # In Makefile.xmega CXX is not defined, causing regular g++ to be
 # invoked, that cannot compile for AVR microcontrollers.
-CXX = avr-g++
+#CXX = avr-g++
+CXX = arm-none-eabi-g++
 
 # -----------------------------------------------------------------------------
 EXTRA_OPTS = NO_EXTRA_OPTS
@@ -51,7 +56,8 @@ CFLAGS += -D$(EXTRA_OPTS)
 #   CRYPTO_TARGET = TINYAES128C
 # endif
 CRYPTO_TARGET = TINYAES128C
-PLATFORM = CWLITEXMEGA
+#PLATFORM = CWLITEXMEGA
+PLATFORM = CW308_STM32F4
 
 ${info Building for platform ${PLATFORM} with CRYPTO_TARGET=$(CRYPTO_TARGET)}
 
