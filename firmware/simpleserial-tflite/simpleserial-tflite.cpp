@@ -75,44 +75,80 @@ extern "C" {
 
 // For now using the main memory for the model for testing.
 static uint8_t *model;
+static size_t model_len = 0;
 
 static size_t model_write_addr_offset = 0;
 static size_t model_read_addr_offset = 0;
 
 static uint8_t get_model_reset(uint8_t* data, uint8_t len)
 {
+   if (model != 0)
+      free(model);
+   
+   // data holds model length, MSB first.
+   model_len = 0;
+
+   for (size_t i=0; i<len; i++) {
+      model_len <<= 8;
+      model_len += data[i];
+   }
+
+   model = (uint8_t *) malloc(model_len * sizeof(uint8_t));
    model_write_addr_offset = 0;
-   return 0x00;
+
+   if (model == 0) {
+      model_len = 0;
+      return 0x01;
+   } else {
+      return 0x00;
+   }
 }
 
 static uint8_t get_model_64(uint8_t* data, uint8_t len)
 {
-   for (size_t i=0; i<64; i++)
+   if (model == 0)
+      return 0x01;
+
+   if (model_write_addr_offset >= model_len)
+      return 0x02;
+
+   for (size_t i=0; i<64; i++) {
+      if (model_write_addr_offset >= model_len)
+	 break;
       model[model_write_addr_offset++] = data[i];
+   }
    
    return 0x00;
 }
 
 static uint8_t put_model_reset(uint8_t* data, uint8_t len)
 {
+   if (model == 0)
+      return 0x01;
+   
    model_read_addr_offset = 0;
    return 0x00;
 }
 
 static uint8_t put_model_64(uint8_t* data, uint8_t len)
 {
-   simpleserial_put('r', 64, model + model_read_addr_offset);
-   model_read_addr_offset += 64;
-   
-   return 0x00;
-}
-
-static uint8_t check_model_ptr(uint8_t* data, uint8_t len)
-{
    if (model == 0)
       return 0x01;
-   else
-      return 0x00;
+
+   if (model_read_addr_offset >= model_len)
+      return 0x02;
+
+   uint8_t model_rb[64];
+   for (size_t i=0; i<64; i++) {
+      if (model_read_addr_offset >= model_len)
+	 model_rb[i] = 0;
+      else
+	 model_rb[i] = model[model_read_addr_offset++];
+   }
+   
+   simpleserial_put('r', 64, model_rb);
+   
+   return 0x00;
 }
 
 
@@ -145,14 +181,10 @@ int main(void)
    // simpleserial_addcmd('s', 2, enc_multi_setnum);
    // simpleserial_addcmd('f', 16, enc_multi_getpt);
 
-   simpleserial_addcmd('a', 0, get_model_reset);
+   simpleserial_addcmd('a', 4, get_model_reset);
    simpleserial_addcmd('b', 64, get_model_64);
    simpleserial_addcmd('c', 0, put_model_reset);
    simpleserial_addcmd('d', 0, put_model_64);
-
-   simpleserial_addcmd('g', 0, check_model_ptr);
-
-   model = (uint8_t *) malloc(1000 * sizeof(uint8_t));
 
    while(1)
       simpleserial_get();

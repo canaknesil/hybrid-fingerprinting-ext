@@ -97,19 +97,27 @@ def ss_read(c, payload_len, timeout=2000):
 # SEND MODEL
 #
 
-if ss_write('g') != 0:
-    raise Exception("Model memory allocation unsuccessful!")
-
-model = bytearray([1, 2] * 32 + [3, 4] * 30)
+model = bytearray([1, 2] * 32 + [3, 4] * 32 + [5])
+print("model length:", len(model))
+model_len = len(model).to_bytes(4, "big")
 
 # Pad model with zeros until its length is multiple of 64.
 model += bytearray([0] * (-len(model) % 64))
 chunks = [model[i:i+64] for i in range(0, len(model), 64)]
 
 print("Sending the model.")
-ss_write('a')
+ret = ss_write('a', model_len)
+if ret != 0:
+    raise Exception("Model memory allocation unsuccessful!")
+
 for chunk in tqdm(chunks):
-    ss_write('b', chunk)
+    ret = ss_write('b', chunk)
+    if ret == 1:
+        raise Exception("Model pointer is null!")
+    elif ret == 2:
+        raise Exception("Model area overflew!")
+    if ret != 0:
+        raise Exception("Error when sending model!")
 
 
 #
@@ -117,8 +125,11 @@ for chunk in tqdm(chunks):
 #
 
 print("Reading the model back for verification.")
+ret = ss_write('c')
+if ret != 0:
+    raise Exception("Model pointer is null!")
+
 chunks2 = []
-ss_write('c')
 for chunk in tqdm(chunks):
     chunk2 = ss_read('d', 64)
     if chunk != chunk2:
