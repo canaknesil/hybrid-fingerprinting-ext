@@ -34,7 +34,8 @@
 TFPATH = ../../../tflite-micro
 FIRMWAREPATH = ${HOME}/Programs/chipwhisperer/hardware/victims/firmware
 
-CRYPTO_TARGET = TINYAES128C
+#CRYPTO_TARGET = TINYAES128C
+CRYPTO_TARGET = NONE
 #PLATFORM = CWLITEXMEGA
 PLATFORM = CW308_STM32F4
 
@@ -48,9 +49,6 @@ TARGET = simpleserial-tflite
 CPPSRC += simpleserial-tflite.cpp
 #SRC += simpleserial-aes.c
 
-
-# In Makefile.xmega CXX is not defined, causing regular g++ to be
-# invoked, that cannot compile for AVR microcontrollers.
 #CXX = avr-g++
 CXX = arm-none-eabi-g++
 
@@ -58,7 +56,7 @@ EXTRA_OPTS = NO_EXTRA_OPTS
 CFLAGS += -D$(EXTRA_OPTS)
 
 
-${info Building for platform ${PLATFORM} with CRYPTO_TARGET=$(CRYPTO_TARGET)}
+${info Building for platform ${PLATFORM}}
 
 
 # Add simpleserial project to build
@@ -66,5 +64,6 @@ SS_VER = SS_VER_1_1
 include $(FIRMWAREPATH)/simpleserial/Makefile.simpleserial
 
 
-include $(FIRMWAREPATH)/Makefile.inc
+#include $(FIRMWAREPATH)/Makefile.inc
+include Makefile.firmware
 
