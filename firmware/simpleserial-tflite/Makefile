@@ -49,6 +49,15 @@ TARGET = simpleserial-tflite
 CPPSRC += simpleserial-tflite.cpp
 #SRC += simpleserial-aes.c
 
+CPPSRC += $(filter-out %_test.cc,$(notdir $(wildcard ${TFPATH}/tensorflow/lite/micro/*.cc)))
+
+VPATH += :${TFPATH}/tensorflow/lite/micro
+
+EXTRAINCDIRS += ${TFPATH}
+EXTRAINCDIRS += ../../../flatbuffers/include
+EXTRAINCDIRS += ../../../gemmlowp
+
+
 #CXX = avr-g++
 CXX = arm-none-eabi-g++
 

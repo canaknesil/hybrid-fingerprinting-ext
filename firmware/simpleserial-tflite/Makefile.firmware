@@ -343,10 +343,12 @@ MSG_CREATING_LIBRARY = Creating library:
 
 
 # Define all object files.
-OBJ = $(SRC:%.c=$(OBJDIR)/%.o) $(CPPSRC:%.cpp=$(OBJDIR)/%.o) $(ASRC:%.S=$(OBJDIR)/%.o)
+OBJ = $(SRC:%.c=$(OBJDIR)/%.o) $(ASRC:%.S=$(OBJDIR)/%.o)
+OBJ += $(filter %.o,$(CPPSRC:%.cpp=$(OBJDIR)/%.o) $(CPPSRC:%.cc=$(OBJDIR)/%.o))
 
 # Define all listing files.
-LST = $(SRC:%.c=$(OBJDIR)/%.lst) $(CPPSRC:%.cpp=$(OBJDIR)/%.lst) $(ASRC:%.S=$(OBJDIR)/%.lst)
+LST = $(SRC:%.c=$(OBJDIR)/%.lst) $(CPPSRC:%.cpp=$(OBJDIR)/%.lst) $(CPPSRC:%.cc=$(OBJDIR)/%.lst) $(ASRC:%.S=$(OBJDIR)/%.lst)
+LST += $(filter %.o,$(CPPSRC:%.cpp=$(OBJDIR)/%.lst) $(CPPSRC:%.cc=$(OBJDIR)/%.lst))
 
 
 # Compiler flags to generate dependency files.
@@ -532,6 +534,13 @@ $(OBJDIR)/%.o : %.cpp
 	$(CXX) -c $(ALL_CPPFLAGS) $< -o $@
 	@echo -e $(DONEMSG)
 
+$(OBJDIR)/%.o : %.cc
+	@$(ECHO_BLANK)
+	@echo Compiling C++:
+	@echo -en $(COMPCPPMSG)
+	$(CXX) -c $(ALL_CPPFLAGS) $< -o $@
+	@echo -e $(DONEMSG)
+
 
 # Compile: create assembler files from C source files.
 %.s : %.c
@@ -540,6 +549,9 @@ $(OBJDIR)/%.o : %.cpp
 
 # Compile: create assembler files from C++ source files.
 %.s : %.cpp
+	$(CC) -S $(ALL_CPPFLAGS) $< -o $@
+
+%.s : %.cc
 	$(CC) -S $(ALL_CPPFLAGS) $< -o $@
 
 

@@ -4,6 +4,14 @@ extern "C" {
 #include <stdint.h>
 #include <stdlib.h>
 }
+#include "tensorflow/lite/core/c/common.h"
+#include "tensorflow/lite/micro/micro_interpreter.h"
+#include "tensorflow/lite/micro/micro_log.h"
+#include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
+#include "tensorflow/lite/micro/micro_profiler.h"
+#include "tensorflow/lite/micro/recording_micro_interpreter.h"
+#include "tensorflow/lite/micro/system_setup.h"
+#include "tensorflow/lite/schema/schema_generated.h"
 
 
 // uint8_t get_mask(uint8_t* m, uint8_t len)
@@ -224,6 +232,21 @@ static uint8_t put_model_64(uint8_t* data, uint8_t len)
 }
 
 
+//
+// TF LITE MICRO DRIVER
+//
+
+static uint8_t tflite_init_model(uint8_t* data, uint8_t len)
+{
+   //tflite::Model* model = ::tflite::GetModel(model_data);
+   return 0x00;
+}
+
+
+//
+// MAIN
+//
+
 int main(void)
 {
    // uint8_t tmp[KEY_LENGTH] = {DEFAULT_KEY};
@@ -257,6 +280,9 @@ int main(void)
    simpleserial_addcmd('b', 64, get_model_64);
    simpleserial_addcmd('c', 0, put_model_reset);
    simpleserial_addcmd('d', 0, put_model_64);
+   simpleserial_addcmd('e', 0, tflite_init_model);
+
+   tflite::InitializeTarget();
 
    while(1)
       simpleserial_get();
