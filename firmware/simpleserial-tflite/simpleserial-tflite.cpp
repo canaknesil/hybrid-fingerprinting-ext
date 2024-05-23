@@ -70,15 +70,113 @@ extern "C" {
 // }
 
 
-// Simpleserial supports receiving at most 64 bytes at a
-// time. Receiving the models in 64 byte chunks.
+//
+// WRITE/READ DATA IN 64-BIT CHUNKS
+//
 
-// For now using the main memory for the model for testing.
+// Simpleserial supports receiving at most 64 bytes at a
+// time. Receiving and sending data in 64 byte chunks.
+
+// Hold data temporarily during write/read.  Keeping the pointer and
+// deallocation is up to the caller, after the write is completed.
+
+// For convenience, space allocated is a multiple of 64 bytes even
+// though the provided length may be smaller. Remaining space is
+// filled with zeros and can be read if necessary.
+
+static uint8_t *data = 0;
+static size_t data_len = 0;
+
+static size_t offset = 0;
+
+
+static uint8_t *write_reset(size_t len)
+{
+   if (len % 64 != 0)
+      len = (len / 64 + 1) * 64;
+
+   data = (uint8_t *) malloc(len * sizeof(uint8_t));
+
+   if (data == 0)
+      return 0;
+   
+   data_len = len;
+   offset = 0;
+
+   for (size_t i=0; i<data_len; i++)
+      data[i] = 0;
+   
+   return data;
+}
+
+
+static uint8_t write_64(uint8_t *chunk)
+{
+   if (data == 0)
+      return 0x01;
+
+   if (offset >= data_len)
+      return 0x02;
+
+   for (size_t i=0; i<64; i++) {
+      if (offset >= data_len)
+	 break;
+      data[offset++] = chunk[i];
+   }
+   
+   return 0x00;
+}
+
+
+static uint8_t read_reset(uint8_t *new_data, size_t new_len)
+{
+   if (new_data == 0)
+      return 0x01;
+   
+   data = new_data;
+   data_len = new_len;
+   offset = 0;
+
+   return 0x00;
+}
+
+
+static uint8_t *read_64()
+{
+   if (data == 0)
+      return 0;
+
+   if (offset >= data_len)
+      return 0;
+
+   uint8_t *data_rb = data + offset;
+   offset += 64;
+   
+   return data_rb;
+}
+
+
+//
+// GET MODEL
+//
+
 static uint8_t *model;
 static size_t model_len = 0;
 
-static size_t model_write_addr_offset = 0;
-static size_t model_read_addr_offset = 0;
+
+static size_t convert_raw_to_uint(uint8_t* bytes, uint8_t bytes_len)
+{
+   size_t n = 0;
+
+   // MSB first
+   for (size_t i=0; i<bytes_len; i++) {
+      n <<= 8;
+      n += bytes[i];
+   }
+
+   return n;
+}
+
 
 static uint8_t get_model_reset(uint8_t* data, uint8_t len)
 {
@@ -86,15 +184,8 @@ static uint8_t get_model_reset(uint8_t* data, uint8_t len)
       free(model);
    
    // data holds model length, MSB first.
-   model_len = 0;
-
-   for (size_t i=0; i<len; i++) {
-      model_len <<= 8;
-      model_len += data[i];
-   }
-
-   model = (uint8_t *) malloc(model_len * sizeof(uint8_t));
-   model_write_addr_offset = 0;
+   model_len = convert_raw_to_uint(data, len);
+   model = write_reset(model_len);
 
    if (model == 0) {
       model_len = 0;
@@ -104,48 +195,29 @@ static uint8_t get_model_reset(uint8_t* data, uint8_t len)
    }
 }
 
+
 static uint8_t get_model_64(uint8_t* data, uint8_t len)
 {
-   if (model == 0)
-      return 0x01;
-
-   if (model_write_addr_offset >= model_len)
-      return 0x02;
-
-   for (size_t i=0; i<64; i++) {
-      if (model_write_addr_offset >= model_len)
-	 break;
-      model[model_write_addr_offset++] = data[i];
-   }
-   
-   return 0x00;
+   return write_64(data);
 }
+
 
 static uint8_t put_model_reset(uint8_t* data, uint8_t len)
 {
-   if (model == 0)
-      return 0x01;
-   
-   model_read_addr_offset = 0;
-   return 0x00;
+   return read_reset(model, model_len);
 }
+
 
 static uint8_t put_model_64(uint8_t* data, uint8_t len)
 {
    if (model == 0)
       return 0x01;
 
-   if (model_read_addr_offset >= model_len)
+   uint8_t *model_rb = read_64();
+
+   if (model_rb == 0)
       return 0x02;
 
-   uint8_t model_rb[64];
-   for (size_t i=0; i<64; i++) {
-      if (model_read_addr_offset >= model_len)
-	 model_rb[i] = 0;
-      else
-	 model_rb[i] = model[model_read_addr_offset++];
-   }
-   
    simpleserial_put('r', 64, model_rb);
    
    return 0x00;

@@ -31,6 +31,13 @@
 
 # To change the target platform, modify PLATFORM and CXX.
 
+TFPATH = ../../../tflite-micro
+FIRMWAREPATH = ${HOME}/Programs/chipwhisperer/hardware/victims/firmware
+
+CRYPTO_TARGET = TINYAES128C
+#PLATFORM = CWLITEXMEGA
+PLATFORM = CW308_STM32F4
+
 
 # Target file name (without extension).
 # This is the base name of the compiled .hex file.
@@ -41,27 +48,18 @@ TARGET = simpleserial-tflite
 CPPSRC += simpleserial-tflite.cpp
 #SRC += simpleserial-aes.c
 
+
 # In Makefile.xmega CXX is not defined, causing regular g++ to be
 # invoked, that cannot compile for AVR microcontrollers.
 #CXX = avr-g++
 CXX = arm-none-eabi-g++
 
-# -----------------------------------------------------------------------------
 EXTRA_OPTS = NO_EXTRA_OPTS
 CFLAGS += -D$(EXTRA_OPTS)
 
 
-# ifeq ($(CRYPTO_TARGET),)
-#   ${info No CRYPTO_TARGET passed - defaulting to TINYAES128C}
-#   CRYPTO_TARGET = TINYAES128C
-# endif
-CRYPTO_TARGET = TINYAES128C
-#PLATFORM = CWLITEXMEGA
-PLATFORM = CW308_STM32F4
-
 ${info Building for platform ${PLATFORM} with CRYPTO_TARGET=$(CRYPTO_TARGET)}
 
-FIRMWAREPATH = ${HOME}/Programs/chipwhisperer/hardware/victims/firmware
 
 # Add simpleserial project to build
 SS_VER = SS_VER_1_1
