@@ -9,8 +9,12 @@ import sys
 PLATFORM = "CW308_STM32F4"
 fw_path = '../firmware/simpleserial-tflite/simpleserial-tflite-{}.hex'.format(PLATFORM)
 
-print("PLATFORM: ", PLATFORM)
-print("fw_path: ", fw_path)
+print("PLATFORM:", PLATFORM)
+print("fw_path:", fw_path)
+
+model_file = sys.argv[1]
+
+print("model_file:", model_file)
 
 
 #
@@ -97,7 +101,11 @@ def ss_read(c, payload_len, timeout=2000):
 # SEND MODEL
 #
 
-model = bytearray([1, 2] * 32 + [3, 4] * 32 + [5])
+#model = bytearray([1, 2] * 32 + [3, 4] * 32 + [5])
+
+with open(model_file, 'rb') as f:
+    model = bytearray(f.read())
+    
 print("model length:", len(model))
 model_len = len(model).to_bytes(4, "big")
 
@@ -136,6 +144,16 @@ for chunk in tqdm(chunks):
         raise Exception("Readback model does not match the original!")
     
 print("Verification successful.")
+
+
+#
+# INIT MODEL
+#
+
+print("Initializing the model.")
+ret = ss_write('e')
+if ret != 0:
+    raise Exception("Model initialization failed!")
 
 
 #

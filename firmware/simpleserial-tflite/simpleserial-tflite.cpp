@@ -238,7 +238,53 @@ static uint8_t put_model_64(uint8_t* data, uint8_t len)
 
 static uint8_t tflite_init_model(uint8_t* data, uint8_t len)
 {
-   //tflite::Model* model = ::tflite::GetModel(model_data);
+   const tflite::Model* tf_model = tflite::GetModel(model);
+
+   if (tf_model == 0)
+      return 0x01;
+
+   // Following lines was inspired by ChatGPT. Query: How to use
+   // tensorflow lite for microcontrollers in a C++ project?
+
+   // Setup error reporter
+   // static tflite::MicroErrorReporter micro_error_reporter;
+   // tflite::ErrorReporter* error_reporter = &micro_error_reporter;
+
+   // // Setup op resolver
+   // static tflite::AllOpsResolver resolver;
+
+   // // Setup tensor arena (this can be tailored to the model's needs)
+   // constexpr int kTensorArenaSize = 10 * 1024;
+   // static uint8_t tensor_arena[kTensorArenaSize];
+
+   // // Setup interpreter
+   // tflite::MicroInterpreter interpreter(model, resolver, tensor_arena, kTensorArenaSize, error_reporter);
+
+   // // Allocate memory from tensor_arena for the model's tensors
+   // TfLiteStatus allocate_status = interpreter.AllocateTensors();
+   // if (allocate_status != kTfLiteOk) {
+   //    error_reporter->Report("AllocateTensors() failed");
+   //    return 1;
+   // }
+
+   // // Obtain pointers to the model's input and output tensors
+   // TfLiteTensor* input = interpreter.input(0);
+   // TfLiteTensor* output = interpreter.output(0);
+
+   // // Fill input tensor with your data
+   // input->data.f[0] = 1.0f;  // Example input
+
+   // // Run inference
+   // TfLiteStatus invoke_status = interpreter.Invoke();
+   // if (invoke_status != kTfLiteOk) {
+   //    error_reporter->Report("Invoke() failed");
+   //    return 1;
+   // }
+
+   // // Process the output
+   // float output_value = output->data.f[0];
+   // error_reporter->Report("Output: %f", output_value);
+   
    return 0x00;
 }
 
