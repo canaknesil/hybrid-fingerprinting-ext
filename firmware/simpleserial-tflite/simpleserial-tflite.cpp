@@ -4,14 +4,14 @@ extern "C" {
 #include <stdint.h>
 #include <stdlib.h>
 }
-#include "tensorflow/lite/core/c/common.h"
-#include "tensorflow/lite/micro/micro_interpreter.h"
-#include "tensorflow/lite/micro/micro_log.h"
-#include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
-#include "tensorflow/lite/micro/micro_profiler.h"
-#include "tensorflow/lite/micro/recording_micro_interpreter.h"
 #include "tensorflow/lite/micro/system_setup.h"
-#include "tensorflow/lite/schema/schema_generated.h"
+#include "tensorflow/lite/micro/micro_mutable_op_resolver.h"
+#include "tensorflow/lite/micro/micro_interpreter.h"
+//#include "tensorflow/lite/schema/schema_generated.h"
+//#include "tensorflow/lite/core/c/common.h"
+//#include "tensorflow/lite/micro/micro_log.h"
+//#include "tensorflow/lite/micro/micro_profiler.h"
+//#include "tensorflow/lite/micro/recording_micro_interpreter.h"
 
 
 // uint8_t get_mask(uint8_t* m, uint8_t len)
@@ -243,30 +243,22 @@ static uint8_t tflite_init_model(uint8_t* data, uint8_t len)
    if (tf_model == 0)
       return 0x01;
 
-   // Following lines was inspired by ChatGPT. Query: How to use
-   // tensorflow lite for microcontrollers in a C++ project?
+   //tflite::MicroMutableOpResolver<6> resolver;
+   //resolver.AddFullyConnected();
+   //resolver.AddConv2D();
+   //resolver.AddDepthwiseConv2D();
+   //resolver.AddReshape();
+   //resolver.AddSoftmax();
+   //resolver.AddAveragePool2D();
 
-   // Setup error reporter
-   // static tflite::MicroErrorReporter micro_error_reporter;
-   // tflite::ErrorReporter* error_reporter = &micro_error_reporter;
+   constexpr int tensor_arena_size = 10 * 1024;
+   uint8_t tensor_arena[tensor_arena_size];
 
-   // // Setup op resolver
-   // static tflite::AllOpsResolver resolver;
+   //tflite::MicroInterpreter interpreter(tf_model, resolver, tensor_arena, tensor_arena_size);
 
-   // // Setup tensor arena (this can be tailored to the model's needs)
-   // constexpr int kTensorArenaSize = 10 * 1024;
-   // static uint8_t tensor_arena[kTensorArenaSize];
+   //interpreter.AllocateTensors();
 
-   // // Setup interpreter
-   // tflite::MicroInterpreter interpreter(model, resolver, tensor_arena, kTensorArenaSize, error_reporter);
-
-   // // Allocate memory from tensor_arena for the model's tensors
-   // TfLiteStatus allocate_status = interpreter.AllocateTensors();
-   // if (allocate_status != kTfLiteOk) {
-   //    error_reporter->Report("AllocateTensors() failed");
-   //    return 1;
-   // }
-
+   
    // // Obtain pointers to the model's input and output tensors
    // TfLiteTensor* input = interpreter.input(0);
    // TfLiteTensor* output = interpreter.output(0);
