@@ -37,3 +37,13 @@ for output_tensor in output_details:
     print(f"Type: {output_tensor['dtype']}")
     print()
 
+print("Tensor Details:")
+for output_tensor in tensor_details:
+    print(f"Name: {output_tensor['name']}")
+    print(f"Shape: {output_tensor['shape']}")
+    print(f"Type: {output_tensor['dtype']}")
+    print()
+
+
+
+

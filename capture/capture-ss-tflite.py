@@ -74,7 +74,7 @@ def disconnect():
     target.dis()
 
 
-def ss_write(c, payload=[], timeout=2000):
+def ss_write(c, payload=[], timeout=4000):
     #print("Sending command '{}'".format(c), end="")
     target.simpleserial_write(c, payload)
     
@@ -85,11 +85,11 @@ def ss_write(c, payload=[], timeout=2000):
     return ret
 
     
-def ss_read(c, payload_len, timeout=2000):
+def ss_read(c, payload_len, timeout=4000):
     #print("Sending command '{}'".format(c), end="")
     target.simpleserial_write(c, [])
 
-    payload = target.simpleserial_read('r', 64)
+    payload = target.simpleserial_read('r', payload_len)
     # target.simpleserial_read internally receives and checks ack
 
     #print(" -> payload")
@@ -101,10 +101,10 @@ def ss_read(c, payload_len, timeout=2000):
 # SEND MODEL
 #
 
-#model = bytearray([1, 2] * 32 + [3, 4] * 32 + [5])
-
 with open(model_file, 'rb') as f:
     model = bytearray(f.read())
+
+#model = bytearray([1, 2] * 32 + [3, 4] * 32 + [5])
     
 print("model length:", len(model))
 model_len = len(model).to_bytes(4, "big")
@@ -127,7 +127,7 @@ for chunk in tqdm(chunks):
     if ret != 0:
         raise Exception("Error when sending model!")
 
-
+        
 #
 # VERIFY MODEL
 #
@@ -153,7 +153,40 @@ print("Verification successful.")
 print("Initializing the model.")
 ret = ss_write('e')
 if ret != 0:
+    print("return code:", ret)
     raise Exception("Model initialization failed!")
+
+
+model_info = ss_read('f', 64)
+if model_info is None:
+    raise Exception("Reading model info failed!")
+
+#print("readback model_info:", model_info)
+
+
+def next_info():
+    global offset
+    info = int.from_bytes(model_info[offset:offset+4])
+    offset += 4
+    return info
+
+offset = 0
+
+input_size = next_info()
+input_shape = []
+for i in range(input_size):
+    dim = next_info()
+    input_shape.append(dim)
+
+output_size = next_info()
+output_shape = []
+for i in range(output_size):
+    dim = next_info()
+    output_shape.append(dim)
+
+print("input_shape:", input_shape)
+print("output_shape:", output_shape)
+
 
 
 #

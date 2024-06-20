@@ -77,213 +77,283 @@ extern "C" {
 //    return 0;
 // }
 
+namespace ss_tflite {
 
-//
-// WRITE/READ DATA IN 64-BIT CHUNKS
-//
+   //
+   // UTILS
+   //
 
-// Simpleserial supports receiving at most 64 bytes at a
-// time. Receiving and sending data in 64 byte chunks.
+   size_t convert_raw_to_uint(uint8_t* bytes, uint8_t bytes_len)
+   {
+      size_t n = 0;
 
-// Hold data temporarily during write/read.  Keeping the pointer and
-// deallocation is up to the caller, after the write is completed.
+      // MSB is bytes[0]
+      for (size_t i=0; i<bytes_len; i++) {
+	 n <<= 8;
+	 n += bytes[i];
+      }
 
-// For convenience, space allocated is a multiple of 64 bytes even
-// though the provided length may be smaller. Remaining space is
-// filled with zeros and can be read if necessary.
-
-static uint8_t *data = 0;
-static size_t data_len = 0;
-
-static size_t offset = 0;
+      return n;
+   }
 
 
-static uint8_t *write_reset(size_t len)
-{
-   if (len % 64 != 0)
-      len = (len / 64 + 1) * 64;
+   void convert_uint32_to_raw(uint8_t *bytes, uint32_t n)
+   {
+      // MSB is bytes[0]
+      for (int i=3; i>=0; i--) {
+	 bytes[i] = n % 256;
+	 n >>= 8;
+      }
+   }
 
-   data = (uint8_t *) malloc(len * sizeof(uint8_t));
-
-   if (data == 0)
-      return 0;
    
-   data_len = len;
-   offset = 0;
+   void ss_put_uint32(uint32_t n)
+   {
+      uint8_t size_raw[4];
+      convert_uint32_to_raw(size_raw, n);
+      simpleserial_put('r', 4, size_raw);
+   }
 
-   for (size_t i=0; i<data_len; i++)
-      data[i] = 0;
+
+   //
+   // WRITE/READ DATA IN 64-BIT CHUNKS
+   //
+
+   // Simpleserial supports receiving at most 64 bytes at a
+   // time. Receiving and sending data in 64 byte chunks.
+
+   // Hold data temporarily during write/read.  Keeping the pointer and
+   // deallocation is up to the caller, after the write is completed.
+
+   // For convenience, space allocated is a multiple of 64 bytes even
+   // though the provided length may be smaller. Remaining space is
+   // filled with zeros and can be read if necessary.
+
+   uint8_t *data = 0;
+   size_t data_len = 0;
+
+   size_t offset = 0;
+
+
+   uint8_t *write_reset(size_t len)
+   {
+      if (len % 64 != 0)
+	 len = (len / 64 + 1) * 64;
+
+      data = (uint8_t *) malloc(len * sizeof(uint8_t));
+
+      if (data == 0)
+	 return 0;
    
-   return data;
-}
+      data_len = len;
+      offset = 0;
+
+      for (size_t i=0; i<data_len; i++)
+	 data[i] = 0;
+   
+      return data;
+   }
 
 
-static uint8_t write_64(uint8_t *chunk)
-{
-   if (data == 0)
-      return 0x01;
+   uint8_t write_64(uint8_t *chunk)
+   {
+      if (data == 0)
+	 return 0x01;
 
-   if (offset >= data_len)
-      return 0x02;
-
-   for (size_t i=0; i<64; i++) {
       if (offset >= data_len)
-	 break;
-      data[offset++] = chunk[i];
-   }
+	 return 0x02;
+
+      for (size_t i=0; i<64; i++) {
+	 if (offset >= data_len)
+	    break;
+	 data[offset++] = chunk[i];
+      }
    
-   return 0x00;
-}
-
-
-static uint8_t read_reset(uint8_t *new_data, size_t new_len)
-{
-   if (new_data == 0)
-      return 0x01;
-   
-   data = new_data;
-   data_len = new_len;
-   offset = 0;
-
-   return 0x00;
-}
-
-
-static uint8_t *read_64()
-{
-   if (data == 0)
-      return 0;
-
-   if (offset >= data_len)
-      return 0;
-
-   uint8_t *data_rb = data + offset;
-   offset += 64;
-   
-   return data_rb;
-}
-
-
-//
-// GET MODEL
-//
-
-static uint8_t *model;
-static size_t model_len = 0;
-
-
-static size_t convert_raw_to_uint(uint8_t* bytes, uint8_t bytes_len)
-{
-   size_t n = 0;
-
-   // MSB first
-   for (size_t i=0; i<bytes_len; i++) {
-      n <<= 8;
-      n += bytes[i];
+      return 0x00;
    }
 
-   return n;
-}
 
-
-static uint8_t get_model_reset(uint8_t* data, uint8_t len)
-{
-   if (model != 0)
-      free(model);
+   uint8_t read_reset(uint8_t *new_data, size_t new_len)
+   {
+      if (new_data == 0)
+	 return 0x01;
    
-   // data holds model length, MSB first.
-   model_len = convert_raw_to_uint(data, len);
-   model = write_reset(model_len);
+      data = new_data;
+      data_len = new_len;
+      offset = 0;
 
-   if (model == 0) {
-      model_len = 0;
-      return 0x01;
-   } else {
+      return 0x00;
+   }
+
+
+   uint8_t *read_64()
+   {
+      if (data == 0)
+	 return 0;
+
+      if (offset >= data_len)
+	 return 0;
+
+      uint8_t *data_rb = data + offset;
+      offset += 64;
+   
+      return data_rb;
+   }
+
+
+   //
+   // GET MODEL
+   //
+
+   uint8_t *model;
+   size_t model_len = 0;
+
+
+   uint8_t get_model_reset(uint8_t* data, uint8_t len)
+   {
+      if (model != 0)
+	 free(model);
+   
+      // data holds model length, MSB first.
+      model_len = convert_raw_to_uint(data, len);
+      model = write_reset(model_len);
+
+      if (model == 0) {
+	 model_len = 0;
+	 return 0x01;
+      } else {
+	 return 0x00;
+      }
+   }
+
+
+   uint8_t get_model_64(uint8_t* data, uint8_t len)
+   {
+      return write_64(data);
+   }
+
+
+   uint8_t put_model_reset(uint8_t* data, uint8_t len)
+   {
+      return read_reset(model, model_len);
+   }
+
+
+   uint8_t put_model_64(uint8_t* data, uint8_t len)
+   {
+      if (model == 0)
+	 return 0x01;
+
+      uint8_t *model_rb = read_64();
+
+      if (model_rb == 0)
+	 return 0x02;
+
+      simpleserial_put('r', 64, model_rb);
+   
+      return 0x00;
+   }
+
+
+   //
+   // TF LITE MICRO DRIVER
+   //
+
+   std::function<tflite::MicroInterpreter&()> get_interpreter;
+
+   tflite::MicroMutableOpResolver<6> resolver;
+   
+   constexpr int tensor_arena_size = 50 * 1024;
+   uint8_t tensor_arena[tensor_arena_size];
+   
+
+   uint8_t tflite_init_model(uint8_t* data, uint8_t len)
+   {
+      const tflite::Model* tf_model = tflite::GetModel(model);
+
+      if (tf_model == 0)
+	 return 0x01;
+
+      tflite::MicroInterpreter interpreter(tf_model, resolver, tensor_arena, tensor_arena_size);
+
+      if (interpreter.initialization_status() != kTfLiteOk)
+	 return 0x02;
+
+      if (interpreter.AllocateTensors() != kTfLiteOk)
+	 return 0x03;
+      
+
+      get_interpreter = [&]() -> tflite::MicroInterpreter& {
+	 return interpreter;
+      };
+   
+      return 0x00;
+   }
+
+
+   uint8_t tflite_put_model_info(uint8_t* data, uint8_t len)
+   {
+      tflite::MicroInterpreter& interpreter = get_interpreter();
+      
+      TfLiteTensor* input = interpreter.input(0);
+      TfLiteTensor* output = interpreter.output(0);
+
+      if (input == 0)
+	 return 0x02;
+      if (output == 0)
+	 return 0x03;
+
+      uint32_t input_size = input->dims->size; // actual type is int
+      uint32_t output_size = output->dims->size;
+
+      uint8_t info[64];
+      size_t offset = 0;
+      
+      convert_uint32_to_raw(&info[offset], input_size);
+      offset += 4;
+      
+      for (size_t i=0; i<input_size; i++) {
+	 uint32_t dim = input->dims->data[i];
+	 convert_uint32_to_raw(&info[offset], dim);
+	 offset += 4;
+      }
+
+      convert_uint32_to_raw(&info[offset], input_size);
+      offset += 4;
+      
+      for (size_t i=0; i<output_size; i++) {
+	 uint32_t dim = output->dims->data[i];
+	 convert_uint32_to_raw(&info[offset], dim);
+	 offset += 4;
+      }
+
+      simpleserial_put('r', 64, info);
+
+
+      // TODO: save expected input and output sizes so that they are
+      // available later on.
+
+
+      // Fill input tensor with your data
+      //input->data.f[0] = 1.0f;  // Example input
+
+      // Run inference
+      //TfLiteStatus invoke_status = interpreter.Invoke();
+
+      // Process the output
+      //float output_value = output->data.f[0];
+
       return 0x00;
    }
 }
 
 
-static uint8_t get_model_64(uint8_t* data, uint8_t len)
-{
-   return write_64(data);
-}
-
-
-static uint8_t put_model_reset(uint8_t* data, uint8_t len)
-{
-   return read_reset(model, model_len);
-}
-
-
-static uint8_t put_model_64(uint8_t* data, uint8_t len)
-{
-   if (model == 0)
-      return 0x01;
-
-   uint8_t *model_rb = read_64();
-
-   if (model_rb == 0)
-      return 0x02;
-
-   simpleserial_put('r', 64, model_rb);
-   
-   return 0x00;
-}
-
-
-//
-// TF LITE MICRO DRIVER
-//
-
-static uint8_t tflite_init_model(uint8_t* data, uint8_t len)
-{
-   const tflite::Model* tf_model = tflite::GetModel(model);
-
-   if (tf_model == 0)
-      return 0x01;
-
-   //tflite::MicroMutableOpResolver<6> resolver;
-   //resolver.AddFullyConnected();
-   //resolver.AddConv2D();
-   //resolver.AddDepthwiseConv2D();
-   //resolver.AddReshape();
-   //resolver.AddSoftmax();
-   //resolver.AddAveragePool2D();
-
-   constexpr int tensor_arena_size = 10 * 1024;
-   uint8_t tensor_arena[tensor_arena_size];
-
-   //tflite::MicroInterpreter interpreter(tf_model, resolver, tensor_arena, tensor_arena_size);
-
-   //interpreter.AllocateTensors();
-
-   
-   // // Obtain pointers to the model's input and output tensors
-   // TfLiteTensor* input = interpreter.input(0);
-   // TfLiteTensor* output = interpreter.output(0);
-
-   // // Fill input tensor with your data
-   // input->data.f[0] = 1.0f;  // Example input
-
-   // // Run inference
-   // TfLiteStatus invoke_status = interpreter.Invoke();
-   // if (invoke_status != kTfLiteOk) {
-   //    error_reporter->Report("Invoke() failed");
-   //    return 1;
-   // }
-
-   // // Process the output
-   // float output_value = output->data.f[0];
-   // error_reporter->Report("Output: %f", output_value);
-   
-   return 0x00;
-}
-
 
 //
 // MAIN
 //
+
+using namespace ss_tflite;
 
 int main(void)
 {
@@ -319,8 +389,15 @@ int main(void)
    simpleserial_addcmd('c', 0, put_model_reset);
    simpleserial_addcmd('d', 0, put_model_64);
    simpleserial_addcmd('e', 0, tflite_init_model);
+   simpleserial_addcmd('f', 0, tflite_put_model_info);
 
    tflite::InitializeTarget();
+   resolver.AddFullyConnected();
+   resolver.AddConv2D();
+   resolver.AddDepthwiseConv2D();
+   resolver.AddReshape();
+   resolver.AddSoftmax();
+   resolver.AddAveragePool2D();
 
    while(1)
       simpleserial_get();
