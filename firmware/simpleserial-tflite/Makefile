@@ -50,6 +50,9 @@ TARGET = simpleserial-tflite
 CPPSRC += simpleserial-tflite.cpp
 #SRC += simpleserial-aes.c
 
+MODEL = models/hello_world_float.cpp
+CPPSRC += ${MODEL}
+
 
 #CPPSRC += $(filter-out %_test.cc,$(notdir $(wildcard ${TFPATH}/tensorflow/lite/micro/*.cc)))
 

@@ -12,70 +12,8 @@ extern "C" {
 //#include "tensorflow/lite/micro/micro_log.h"
 //#include "tensorflow/lite/micro/micro_profiler.h"
 //#include "tensorflow/lite/micro/recording_micro_interpreter.h"
+#include "model.h"
 
-
-// uint8_t get_mask(uint8_t* m, uint8_t len)
-// {
-//    aes_indep_mask(m, len);
-//    return 0x00;
-// }
-
-// uint8_t get_key(uint8_t* k, uint8_t len)
-// {
-//    aes_indep_key(k);
-//    return 0x00;
-// }
-
-// uint8_t get_pt(uint8_t* pt, uint8_t len)
-// {
-//    aes_indep_enc_pretrigger(pt);
-
-//    trigger_high();
-
-// #ifdef ADD_JITTER
-//    for (volatile uint8_t k = 0; k < (*pt & 0x0F); k++);
-// #endif
-
-//    aes_indep_enc(pt); /* encrypting the data block */
-//    trigger_low();
-
-//    aes_indep_enc_posttrigger(pt);
-
-//    simpleserial_put('r', 16, pt);
-//    return 0x00;
-// }
-
-// uint8_t reset(uint8_t* x, uint8_t len)
-// {
-//    // Reset key here if needed
-//    return 0x00;
-// }
-
-// static uint16_t num_encryption_rounds = 10;
-
-// uint8_t enc_multi_getpt(uint8_t* pt, uint8_t len)
-// {
-//    aes_indep_enc_pretrigger(pt);
-
-//    for(unsigned int i = 0; i < num_encryption_rounds; i++){
-//       trigger_high();
-//       aes_indep_enc(pt);
-//       trigger_low();
-//    }
-
-//    aes_indep_enc_posttrigger(pt);
-//    simpleserial_put('r', 16, pt);
-//    return 0;
-// }
-
-// uint8_t enc_multi_setnum(uint8_t* t, uint8_t len)
-// {
-//    //Assumes user entered a number like [0, 200] to mean "200"
-//    //which is most sane looking for humans I think
-//    num_encryption_rounds = t[1];
-//    num_encryption_rounds |= t[0] << 8;
-//    return 0;
-// }
 
 namespace ss_tflite {
 
@@ -262,60 +200,6 @@ namespace ss_tflite {
 
 
    //
-   // GET MODEL
-   //
-
-   uint8_t *model;
-   size_t model_len = 0;
-
-
-   uint8_t get_model_reset(uint8_t* data, uint8_t len)
-   {
-      if (model != 0)
-	 free(model);
-   
-      // data holds model length, MSB first.
-      model_len = convert_raw_to_uint(data, len);
-      model = write_reset(model_len);
-
-      if (model == 0) {
-	 model_len = 0;
-	 return 0x01;
-      } else {
-	 return 0x00;
-      }
-   }
-
-
-   uint8_t get_model_64(uint8_t* data, uint8_t len)
-   {
-      return write_64(data);
-   }
-
-
-   uint8_t put_model_reset(uint8_t* data, uint8_t len)
-   {
-      return read_reset(model, model_len);
-   }
-
-
-   uint8_t put_model_64(uint8_t* data, uint8_t len)
-   {
-      if (model == 0)
-	 return 0x01;
-
-      uint8_t *model_rb = read_64();
-
-      if (model_rb == 0)
-	 return 0x02;
-
-      simpleserial_put('r', 64, model_rb);
-   
-      return 0x00;
-   }
-
-
-   //
    // GET INPUT DATA
    //
 
@@ -346,8 +230,8 @@ namespace ss_tflite {
    // PUT OUTPUT DATA
    //
 
-   // Output data buffer is allocated and deallocated during model
-   // initialization.
+   // Output data buffer is allocated and deallocated during model IO
+   // preparation.
    uint8_t *output_data;
    size_t output_data_len = 0;
 
@@ -378,13 +262,8 @@ namespace ss_tflite {
    // TF LITE MICRO DRIVER
    //
 
-   std::function<tflite::MicroInterpreter&()> get_interpreter;
-
-   tflite::MicroMutableOpResolver<6> resolver;
+   tflite::MicroInterpreter *interpreter;
    
-   constexpr int tensor_arena_size = 50 * 1024;
-   uint8_t tensor_arena[tensor_arena_size];
-
    size_t model_input_n_dims = 0;
    size_t model_input_dims[16] = {0};
    TfLiteType model_input_type;
@@ -394,30 +273,11 @@ namespace ss_tflite {
    TfLiteType model_output_type;
 
    
-   uint8_t tflite_init_model(uint8_t* data, uint8_t len)
+   uint8_t prepare_model_io(tflite::MicroInterpreter &interpreter)
    {
-      // Initialize interpreter
-      const tflite::Model* tf_model = tflite::GetModel(model);
-
-      if (tf_model == 0)
-	 return 0x01;
-
-      tflite::MicroInterpreter interpreter(tf_model, resolver, tensor_arena, tensor_arena_size);
-
-      if (interpreter.initialization_status() != kTfLiteOk)
-	 return 0x02;
-
-      if (interpreter.AllocateTensors() != kTfLiteOk)
-	 return 0x03;
-
       // Save model input/output info.
       TfLiteTensor* input = interpreter.input(0);
       TfLiteTensor* output = interpreter.output(0);
-
-      if (input == 0)
-	 return 0x04;
-      if (output == 0)
-	 return 0x05;
 
       model_input_n_dims = input->dims->size; // actual type is int
       model_output_n_dims = output->dims->size;
@@ -450,22 +310,15 @@ namespace ss_tflite {
       input_data = (uint8_t *) malloc(multiple_of_64(input_data_len) * sizeof(uint8_t));
       output_data = (uint8_t *) malloc(multiple_of_64(output_data_len) * sizeof(uint8_t));
 
-      if (input_data == 0)
-	 return 0x06;
-      if (output_data == 0)
-	 return 0x07;
-      
-      // Closure for the interpreter
-      get_interpreter = [&]() -> tflite::MicroInterpreter& {
-	 return interpreter;
-      };
-   
       return 0x00;
    }
 
 
    uint8_t tflite_put_model_info(uint8_t* data, uint8_t len)
    {
+      if (interpreter->initialization_status() != kTfLiteOk)
+	 return 0x01;
+      
       uint8_t info[64];
       size_t offset = 0;
       
@@ -501,26 +354,28 @@ namespace ss_tflite {
 
    uint8_t tflite_invoke(uint8_t* data, uint8_t len)
    {
-      tflite::MicroInterpreter& interpreter = get_interpreter();
-
-      TfLiteTensor* input = interpreter.input(0);
-      TfLiteTensor* output = interpreter.output(0);
-
-      // // This works only for float32.
-      // for (size_t i=0; i<input_data_len/sizeof(float); i++) {
-      // 	 float *input_data_casted = (float *) input_data;
-      // 	 input->data.f[i] = input_data_casted[i];
-      // }
-      input->data.f[0] = 0.0;
-
-      if (interpreter.Invoke() != kTfLiteOk)
-	 return 0x03;
+      TfLiteTensor* input = interpreter->input(0);
+      TfLiteTensor* output = interpreter->output(0);
 
       // This works only for float32.
-      // for (size_t i=0; i<output_data_len/sizeof(float); i++) {
-      // 	 float *output_data_casted = (float *) output_data;
-      // 	 output_data_casted[i] = output->data.f[i];
-      // }
+      for (size_t i=0; i<input_data_len/sizeof(float); i++) {
+	 float *input_data_casted = (float *) input_data;
+	 input->data.f[i] = input_data_casted[i];
+      }
+      //input->data.f[0] = 0.0;
+
+      trigger_high();
+      TfLiteStatus status = interpreter->Invoke();
+      trigger_low();
+      
+      if (status != kTfLiteOk)
+	 return 0x01;
+
+      // This works only for float32.
+      for (size_t i=0; i<output_data_len/sizeof(float); i++) {
+	 float *output_data_casted = (float *) output_data;
+	 output_data_casted[i] = output->data.f[i];
+      }
       
       return 0x00;
    }
@@ -536,50 +391,40 @@ using namespace ss_tflite;
 
 int main(void)
 {
-   // uint8_t tmp[KEY_LENGTH] = {DEFAULT_KEY};
-
+   // Initialize platform
    platform_init();
    init_uart();
    trigger_setup();
 
-   // aes_indep_init();
-   // aes_indep_key(tmp);
-
-   /* Uncomment this to get a HELLO message for debug */
-
-   // putch('h');
-   // putch('e');
-   // putch('l');
-   // putch('l');
-   // putch('o');
-   // putch('\n');
-
    simpleserial_init();
-
-   // simpleserial_addcmd('k', 16, get_key);
-   // simpleserial_addcmd('p', 16,  get_pt);
-   // simpleserial_addcmd('x',  0,   reset);
-   // simpleserial_addcmd_flags('m', 18, get_mask, CMD_FLAG_LEN);
-   // simpleserial_addcmd('s', 2, enc_multi_setnum);
-   // simpleserial_addcmd('f', 16, enc_multi_getpt);
-
-   simpleserial_addcmd('a', 4, get_model_reset);
-   simpleserial_addcmd('b', 64, get_model_64);
-   simpleserial_addcmd('c', 0, put_model_reset);
-   simpleserial_addcmd('d', 0, put_model_64);
-   simpleserial_addcmd('e', 0, tflite_init_model);
    simpleserial_addcmd('f', 0, tflite_put_model_info);
    simpleserial_addcmd('g', 0, get_input_data_reset);
    simpleserial_addcmd('h', 64, get_input_data_64);
    simpleserial_addcmd('i', 0, tflite_invoke);
+   simpleserial_addcmd('j', 0, put_output_data_reset);
+   simpleserial_addcmd('k', 0, put_output_data_64);
 
+   // Initialize tflite
    tflite::InitializeTarget();
+
+   tflite::MicroMutableOpResolver<6> resolver;
    resolver.AddFullyConnected();
    resolver.AddConv2D();
    resolver.AddDepthwiseConv2D();
    resolver.AddReshape();
    resolver.AddSoftmax();
    resolver.AddAveragePool2D();
+
+   constexpr int tensor_arena_size = 50 * 1024;
+   uint8_t tensor_arena[tensor_arena_size];
+
+   const tflite::Model* tf_model = tflite::GetModel(model);
+
+   tflite::MicroInterpreter interpreter_local(tf_model, resolver, tensor_arena, tensor_arena_size);
+   interpreter = &interpreter_local;
+
+   interpreter_local.AllocateTensors();
+   prepare_model_io(interpreter_local);
 
    while(1)
       simpleserial_get();

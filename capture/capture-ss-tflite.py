@@ -2,6 +2,7 @@ import chipwhisperer as cw
 import time
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import numpy as np
 import sys
 
 
@@ -12,9 +13,12 @@ fw_path = '../firmware/simpleserial-tflite/simpleserial-tflite-{}.hex'.format(PL
 print("PLATFORM:", PLATFORM)
 print("fw_path:", fw_path)
 
-model_file = sys.argv[1]
+# Scope settings
+n_samples = 24400 # For CW Lite, default=5000, max=24400
+adc_clk_src = 'clkgen_x1'
+decimation = 2 # ADC downsampling factor, sampling rate is 1/decimation of the sampling clock
 
-print("model_file:", model_file)
+# Invocation of hello_world_float.tflite takes 40.000 clock cycles.
 
 
 #
@@ -43,7 +47,14 @@ else:
     prog = None
 
 time.sleep(0.05)
-scope.default_setup()
+scope.default_setup();
+scope.adc.samples = n_samples
+scope.adc.decimate = decimation
+scope.clock.adc_src = adc_clk_src
+time.sleep(0.1)
+print("Target clock freq:", scope.clock.clkgen_freq)
+print("Sampling rate:", scope.clock.adc_rate)
+
 
 
 def reset_target(scope):
@@ -105,64 +116,8 @@ def multiply_list(lst):
 
 
 #
-# SEND MODEL
+# GET MODEL INFO
 #
-
-with open(model_file, 'rb') as f:
-    model = bytearray(f.read())
-
-#model = bytearray([1, 2] * 32 + [3, 4] * 32 + [5])
-    
-print("model length:", len(model))
-model_len = len(model).to_bytes(4, "big")
-
-# Pad model with zeros until its length is multiple of 64.
-model += bytearray([0] * (-len(model) % 64))
-chunks = [model[i:i+64] for i in range(0, len(model), 64)]
-
-print("Sending the model.")
-ret = ss_write('a', model_len)
-if ret != 0:
-    raise Exception("Model memory allocation unsuccessful!")
-
-for chunk in tqdm(chunks):
-    ret = ss_write('b', chunk)
-    if ret == 1:
-        raise Exception("Model pointer is null!")
-    elif ret == 2:
-        raise Exception("Model area overflew!")
-    if ret != 0:
-        raise Exception("Error when sending model!")
-
-        
-#
-# VERIFY MODEL
-#
-
-print("Reading the model back for verification.")
-ret = ss_write('c')
-if ret != 0:
-    raise Exception("Model pointer is null!")
-
-chunks2 = []
-for chunk in tqdm(chunks):
-    chunk2 = ss_read('d', 64)
-    if chunk != chunk2:
-        raise Exception("Readback model does not match the original!")
-    
-print("Verification successful.")
-
-
-#
-# INIT MODEL
-#
-
-print("Initializing the model.")
-ret = ss_write('e')
-if ret != 0:
-    print("return code:", ret)
-    raise Exception("Model initialization failed!")
-
 
 model_info = ss_read('f', 64)
 if model_info is None:
@@ -286,34 +241,83 @@ def send_input_data(data):
             raise Exception("Error when sending input data!")
 
 
+def receive_output_data():
+    ret = ss_write('j')
+    if ret != 0:
+        raise Exception("Output data pointer is null!")
 
-input_data = bytearray([0] * 4)
-print("Sending input data.")
-send_input_data(input_data)
+    output_data = bytearray()
+
+    n_chunk = correct_output_len // 64
+    if correct_output_len % 64 != 0:
+        n_chunk += 1
+
+    for i in range(n_chunk):
+        chunk = ss_read('k', 64)
+        output_data += chunk
+
+    return output_data[:correct_output_len]
+        
+
+def invoke_and_capture_trace():
+    scope.arm()
+
+    invoke()
+
+    ret = scope.capture(poll_done=False)
+
+    i = 0
+    while not target.is_done():
+        i += 1
+        time.sleep(0.05)
+        if i > 100:
+            print("Warning: Target did not finish operation!")
+            return None
+
+    if ret:
+        print("Warning: Timeout happened during capture!")
+        return None
+
+    wave = scope.get_last_trace(as_int=False)
+
+    if len(wave) >= 1:
+        return wave
+    else:
+        return None
 
 
+def invoke():
+    ret = ss_write('i')
+    if ret != 0:
+        raise Exception("Invocation unsuccessful!")
+    
 
-# print("Invoking.")
-# ret = ss_write('i')
-# if ret != 0:
-#     raise Exception("Invocation unsuccessful!")
+num_traces = 50
+
+inputs = np.zeros([num_traces] + input_shape, dtype=np.float32)
+outputs = np.zeros([num_traces] + output_shape, dtype=np.float32)
+traces = np.zeros([num_traces, n_samples], dtype=np.float64)
+
+print("Capturing traces.")
+for i in tqdm(range(num_traces)):
+    input_data = np.full(input_shape, 0.5, dtype=np.float32)
+    inputs[i] = input_data
+    input_data = bytearray(input_data)
+    send_input_data(input_data)
+
+    #invoke()
+    trace = invoke_and_capture_trace()
+    if trace is None:
+        raise Exception("Capture unsuccessful!")
+    traces[i] = trace
+
+    output_data = receive_output_data()
+    output_data = np.frombuffer(output_data, dtype=np.float32).reshape(output_shape)
+    outputs[i] = output_data
 
 
+plt.plot(np.average(traces, axis=0))
 
-# ktp = cw.ktp.Basic()
-
-# num_traces = 2
-
-# print("Capturing traces...")
-# for i in tqdm(range(num_traces)):
-#     key, text = ktp.next()  # manual creation of a key, text pair can be substituted here
-#     trace = cw.capture_trace(scope, target, text, key)
-#     if trace is None:
-#         continue
-#     project.traces.append(trace)
-
-# project.save()
-# plt.plot(project.waves[0])
 
 #
 # DISCONNECT
@@ -322,4 +326,4 @@ send_input_data(input_data)
 disconnect()
 
 
-#plt.show()
+plt.show()
