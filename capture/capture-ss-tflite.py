@@ -74,7 +74,7 @@ def disconnect():
     target.dis()
 
 
-def ss_write(c, payload=[], timeout=4000):
+def ss_write(c, payload=[], timeout=5000):
     #print("Sending command '{}'".format(c), end="")
     target.simpleserial_write(c, payload)
     
@@ -85,7 +85,7 @@ def ss_write(c, payload=[], timeout=4000):
     return ret
 
     
-def ss_read(c, payload_len, timeout=4000):
+def ss_read(c, payload_len, timeout=5000):
     #print("Sending command '{}'".format(c), end="")
     target.simpleserial_write(c, [])
 
@@ -95,6 +95,13 @@ def ss_read(c, payload_len, timeout=4000):
     #print(" -> payload")
 
     return payload
+
+
+def multiply_list(lst):
+    prod = 1
+    for n in lst:
+        prod *= n
+    return prod
 
 
 #
@@ -172,26 +179,126 @@ def next_info():
 
 offset = 0
 
-input_size = next_info()
+input_n_dims = next_info()
 input_shape = []
-for i in range(input_size):
+for i in range(input_n_dims):
     dim = next_info()
     input_shape.append(dim)
 
-output_size = next_info()
+output_n_dims = next_info()
 output_shape = []
-for i in range(output_size):
+for i in range(output_n_dims):
     dim = next_info()
     output_shape.append(dim)
 
 print("input_shape:", input_shape)
 print("output_shape:", output_shape)
 
+input_type = next_info()
+output_type = next_info()
+
+tflite_types = {
+    0: "kTfLiteNoType",
+    1: "kTfLiteFloat32",
+    2: "kTfLiteInt32",
+    3: "kTfLiteUInt8",
+    4: "kTfLiteInt64",
+    5: "kTfLiteString",
+    6: "kTfLiteBool",
+    7: "kTfLiteInt16",
+    8: "kTfLiteComplex64",
+    9: "kTfLiteInt8",
+    10: "kTfLiteFloat16",
+    11: "kTfLiteFloat64",
+    12: "kTfLiteComplex128",
+    13: "kTfLiteUInt64",
+    14: "kTfLiteResource",
+    15: "kTfLiteVariant",
+    16: "kTfLiteUInt32",
+    17: "kTfLiteUInt16",
+    18: "kTfLiteInt4",
+    19: "kTfLiteBFloat16",
+}
+
+tflite_type_sizes = {
+    #"kTfLiteNoType": 0,
+    "kTfLiteFloat32": 4,
+    "kTfLiteInt32": 4,
+    "kTfLiteUInt8": 1,
+    "kTfLiteInt64": 8,
+    #"kTfLiteString": 0,
+    #"kTfLiteBool": 0,
+    "kTfLiteInt16": 2,
+    #"kTfLiteComplex64": 0,
+    "kTfLiteInt8": 1,
+    "kTfLiteFloat16": 2,
+    "kTfLiteFloat64": 8,
+    #"kTfLiteComplex128": 0,
+    "kTfLiteUInt64": 8,
+    #"kTfLiteResource": 0,
+    #"kTfLiteVariant": 0,
+    "kTfLiteUInt32": 4,
+    "kTfLiteUInt16": 2,
+    #"kTfLiteInt4": 0,
+    #"kTfLiteBFloat16": 0,
+}
+
+def size_of_type(t):
+    if type(t) == int:
+        t = tflite_types[t]
+    assert type(t) == str
+    return tflite_type_sizes[t]
+    
+
+print("input_type:", input_type, tflite_types[input_type])
+print("output_type:", output_type, tflite_types[output_type])
+
+correct_input_len = multiply_list(input_shape) * size_of_type(input_type)
+correct_output_len = multiply_list(output_shape) * size_of_type(output_type)
 
 
 #
 # CAPTURE
 #
+
+
+def send_input_data(data):
+    assert len(data) == correct_input_len
+
+    # No need to send length as the input size is known.
+    #data_len = len(data).to_bytes(4, "big")
+
+    # Pad model with zeros until its length is multiple of 64.
+    data += bytearray([0] * (-len(data) % 64))
+    chunks = [data[i:i+64] for i in range(0, len(data), 64)]
+
+    ret = ss_write('g')
+    if ret != 0:
+        raise Exception("Input data transfer initialization unsuccessful!")
+    
+    for chunk in chunks:
+        ret = ss_write('h', chunk)
+        if ret == 1:
+            raise Exception("Input data pointer is null!")
+        elif ret == 2:
+            raise Exception("Input data area overflew!")
+        if ret != 0:
+            raise Exception("Error when sending input data!")
+
+
+
+input_data = bytearray([0] * 4)
+print("Sending input data.")
+send_input_data(input_data)
+
+
+
+# print("Invoking.")
+# ret = ss_write('i')
+# if ret != 0:
+#     raise Exception("Invocation unsuccessful!")
+
+
 
 # ktp = cw.ktp.Basic()
 
