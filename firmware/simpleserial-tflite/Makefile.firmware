@@ -27,7 +27,9 @@
 
 include $(FIRMWAREPATH)/hal/Makefile.hal
 ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(MAKECMDGOALS),convert_model)
 	include $(FIRMWAREPATH)/simpleserial/Makefile.simpleserial
+endif
 endif
 
 #Debug - can be useful to see variables
@@ -554,10 +556,25 @@ clean:
 # Listing of phony targets.
 .PHONY : all finish sizeafter gccversion \
 build build_info elf hex bin eep lss sym coff extcoff \
-clean clean_print program debug gdb-config
+clean clean_print program debug gdb-config convert_model
 
 # saveplatform: Save the platform into the file Makefile.target
 saveplatform:
 	-@rm -f Makefile.platform
 	@echo "Saving Makefile.platform"
 	@echo >Makefile.platform "PLATFORM = $(PLATFORM)"
+
+
+# Convert .tflite file into C++ array file
+convert_model:
+	@echo Converting ${MODEL_TFLITE} to ${MODEL}
+	@echo "#include \"model.h\"" > ${MODEL}
+	@echo "namespace ss_tflite {" >> ${MODEL}
+	@echo "const unsigned char model[] = {" >> ${MODEL}
+	@cat ${MODEL_TFLITE} | xxd -i >> ${MODEL}
+	@echo "};" >> ${MODEL}
+	@echo -n "const unsigned int model_len = " >> ${MODEL}
+	@echo -n $(shell stat -c %s ${MODEL_TFLITE}) >> ${MODEL}
+	@echo ";" >> ${MODEL}
+	@echo "}" >> ${MODEL}
+

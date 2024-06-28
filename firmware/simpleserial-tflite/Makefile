@@ -50,7 +50,8 @@ TARGET = simpleserial-tflite
 CPPSRC += simpleserial-tflite.cpp
 #SRC += simpleserial-aes.c
 
-MODEL = models/hello_world_float.cpp
+MODEL_TFLITE = ../../models/hello_world_float.tflite
+MODEL = models/model.cpp
 CPPSRC += ${MODEL}
 
 

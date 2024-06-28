@@ -16,9 +16,10 @@ print("fw_path:", fw_path)
 # Scope settings
 n_samples = 24400 # For CW Lite, default=5000, max=24400
 adc_clk_src = 'clkgen_x1'
-decimation = 2 # ADC downsampling factor, sampling rate is 1/decimation of the sampling clock
+decimation = 4 # ADC downsampling factor, sampling rate is 1/decimation of the sampling clock
 
 # Invocation of hello_world_float.tflite takes 40.000 clock cycles.
+#               mnist_model.tflite             80.000
 
 
 #

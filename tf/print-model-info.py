@@ -22,20 +22,20 @@ output_details = interpreter.get_output_details()
 tensor_details = interpreter.get_tensor_details()
 
 # Print input details
-print("Input Details:")
-for input_tensor in input_details:
-    print(f"Name: {input_tensor['name']}")
-    print(f"Shape: {input_tensor['shape']}")
-    print(f"Type: {input_tensor['dtype']}")
-    print()
+# print("Input Details:")
+# for input_tensor in input_details:
+#     print(f"Name: {input_tensor['name']}")
+#     print(f"Shape: {input_tensor['shape']}")
+#     print(f"Type: {input_tensor['dtype']}")
+#     print()
 
 # Print output details
-print("Output Details:")
-for output_tensor in output_details:
-    print(f"Name: {output_tensor['name']}")
-    print(f"Shape: {output_tensor['shape']}")
-    print(f"Type: {output_tensor['dtype']}")
-    print()
+# print("Output Details:")
+# for output_tensor in output_details:
+#     print(f"Name: {output_tensor['name']}")
+#     print(f"Shape: {output_tensor['shape']}")
+#     print(f"Type: {output_tensor['dtype']}")
+#     print()
 
 print("Tensor Details:")
 for output_tensor in tensor_details:
