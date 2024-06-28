@@ -1,3 +1,4 @@
+import numpy as np
 
 
 tflite_types = {
@@ -45,6 +46,18 @@ tflite_type_sizes = {
     #"kTfLiteInt4": 0,
     #"kTfLiteBFloat16": 0,
 }
+
+tflite_type_np_equvalents = {
+    "kTfLiteFloat32": np.float32,
+}
+
+
+def tflite_type_to_np(t):
+    if type(t) == int:
+        t = tflite_types[t]
+    assert type(t) == str
+    return tflite_type_np_equvalents[t]
+
 
 def size_of_tflite_type(t):
     if type(t) == int:

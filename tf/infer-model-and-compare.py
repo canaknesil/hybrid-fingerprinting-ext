@@ -42,7 +42,7 @@ for i, input_data in enumerate(inputs):
 
 max_error = np.max(np.abs(outputs_micro - outputs))
 print("max_error:", max_error)
-
+print("For comparison, largest single floating point error is", np.float64(1.1920929e-7))
 
 
 

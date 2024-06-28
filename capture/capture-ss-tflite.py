@@ -96,6 +96,9 @@ output_type = next_info()
 print("input_type:", input_type, tflite_types[input_type])
 print("output_type:", output_type, tflite_types[output_type])
 
+input_type_np = tflite_type_to_np(input_type)
+output_type_np = tflite_type_to_np(output_type)
+
 correct_input_len = multiply_list(input_shape) * size_of_tflite_type(input_type)
 correct_output_len = multiply_list(output_shape) * size_of_tflite_type(output_type)
 
@@ -171,34 +174,34 @@ def infer_and_capture_trace(input_data, capture_trace=True):
             raise Exception("Capture unsuccessful!")
         
     output_data = receive_output_data()
-    output_data = np.frombuffer(output_data, dtype=np.float32).reshape(output_shape)
+    output_data = np.frombuffer(output_data, dtype=output_type_np).reshape(output_shape)
     return output_data, wave
 
 
 # print("Test inference")
-# input_data = np.full(input_shape, 0.5, dtype=np.float32)
+# input_data = np.full(input_shape, 0.5, dtype=input_type_np)
 # output_data = infer(input_data)
 # print(output_data)
 
 
 print("Capturing warming-up traces.")
 for i in range(3):
-    #input_data = np.full(input_shape, 0.5, dtype=np.float32)
-    input_data = np.random.rand(*input_shape).astype(np.float32)
+    #input_data = np.full(input_shape, 0.5, dtype=input_type_np)
+    input_data = np.random.rand(*input_shape).astype(input_type_np)
 
     output_data, trace = infer_and_capture_trace(input_data)
     
 
 num_traces = 50
 
-inputs = np.zeros([num_traces] + input_shape, dtype=np.float32)
-outputs = np.zeros([num_traces] + output_shape, dtype=np.float32)
+inputs = np.zeros([num_traces] + input_shape, dtype=input_type_np)
+outputs = np.zeros([num_traces] + output_shape, dtype=output_type_np)
 traces = np.zeros([num_traces, n_samples], dtype=np.float64)
 
 print("Capturing traces.")
 for i in tqdm(range(num_traces)):
-    #input_data = np.full(input_shape, 0.5, dtype=np.float32)
-    input_data = np.random.rand(*input_shape).astype(np.float32)
+    #input_data = np.full(input_shape, 0.5, dtype=input_type_np)
+    input_data = np.random.rand(*input_shape).astype(input_type_np)
     inputs[i] = input_data
 
     output_data, trace = infer_and_capture_trace(input_data)
