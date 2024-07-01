@@ -9,7 +9,7 @@ import sys
 import util
 
 
-model_file_prefix = "models/mnist_model"
+model_file_prefix = "models/mnist"
 
 
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
@@ -44,5 +44,7 @@ model.fit(x_train, y_train, epochs=20, batch_size=32, validation_split=0.2)
 test_loss, test_acc = model.evaluate(x_test, y_test)
 print(f'Test accuracy: {test_acc}')
 
-util.save_model(model, model_file_prefix)
+util.save_model(model, f"{model_file_prefix}_{xsize}x{ysize}")
+
+
 

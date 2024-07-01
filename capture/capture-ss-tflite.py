@@ -9,13 +9,22 @@ import sys
 
 #PLATFORM = "CWLITEXMEGA"
 PLATFORM = "CW308_STM32F4"
-fw_path = '../firmware/simpleserial-tflite/simpleserial-tflite-{}.hex'.format(PLATFORM)
 
+#fw_path = '../firmware/simpleserial-tflite/simpleserial-tflite-{}.hex'.format(PLATFORM)
+fw_path = sys.argv[1]
+input_data_path = sys.argv[2]
+avg_factor = 1
 capture_dir = "traces"
 
 print("PLATFORM:", PLATFORM)
 print("fw_path:", fw_path)
+print("input_data_path:", input_data_path)
+print("avg_factor:", avg_factor)
 print("capture_dir:", capture_dir)
+
+# TODO: input_data_path (use testing data files)
+# TODO: avg_factor
+
 
 # Scope settings
 n_samples = 24400 # For CW Lite, default=5000, max=24400
