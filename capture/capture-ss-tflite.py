@@ -30,8 +30,6 @@ print("input data type:", test_data.dtype)
 assert num_traces <= test_data.shape[0]
 test_data = test_data[:num_traces]
 
-# TODO: avg_factor
-
 
 # Scope settings
 n_samples = 24400 # For CW Lite, default=5000, max=24400
