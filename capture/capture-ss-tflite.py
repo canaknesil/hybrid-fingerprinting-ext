@@ -13,16 +13,23 @@ PLATFORM = "CW308_STM32F4"
 #fw_path = '../firmware/simpleserial-tflite/simpleserial-tflite-{}.hex'.format(PLATFORM)
 fw_path = sys.argv[1]
 input_data_path = sys.argv[2]
+capture_path_prefix = sys.argv[3]
+
+num_traces = 1000
 avg_factor = 1
-capture_dir = "traces"
 
 print("PLATFORM:", PLATFORM)
 print("fw_path:", fw_path)
 print("input_data_path:", input_data_path)
+print("num_traces:", num_traces)
 print("avg_factor:", avg_factor)
-print("capture_dir:", capture_dir)
 
-# TODO: input_data_path (use testing data files)
+test_data = np.load(input_data_path)
+print("input data shape:", test_data.shape)
+print("input data type:", test_data.dtype)
+assert num_traces <= test_data.shape[0]
+test_data = test_data[:num_traces]
+
 # TODO: avg_factor
 
 
@@ -193,37 +200,58 @@ def infer_and_capture_trace(input_data, capture_trace=True):
 # print(output_data)
 
 
+# Check input data type and shape
+assert input_shape[0] == 1
+assert output_shape[0] == 1
+assert list(test_data.shape[1:]) == list(input_shape[1:])
+assert test_data.dtype == input_type_np
+
+
 print("Capturing warming-up traces.")
 for i in range(3):
     #input_data = np.full(input_shape, 0.5, dtype=input_type_np)
     input_data = np.random.rand(*input_shape).astype(input_type_np)
 
     output_data, trace = infer_and_capture_trace(input_data)
-    
 
-num_traces = 50
 
 inputs = np.zeros([num_traces] + input_shape, dtype=input_type_np)
 outputs = np.zeros([num_traces] + output_shape, dtype=output_type_np)
 traces = np.zeros([num_traces, n_samples], dtype=np.float64)
 
+traces_to_avg = np.zeros([avg_factor, n_samples], dtype=np.float64)
+outputs_before_avg = np.zeros([avg_factor] + output_shape, dtype=output_type_np)
+
 print("Capturing traces.")
 for i in tqdm(range(num_traces)):
     #input_data = np.full(input_shape, 0.5, dtype=input_type_np)
-    input_data = np.random.rand(*input_shape).astype(input_type_np)
+    #input_data = np.random.rand(*input_shape).astype(input_type_np)
+    input_data = test_data[i]
     inputs[i] = input_data
 
-    output_data, trace = infer_and_capture_trace(input_data)
+    if avg_factor == 1:
+        output_data, trace = infer_and_capture_trace(input_data)
+        traces[i] = trace
+        outputs[i] = output_data
+    else:
+        for j in range(avg_factor):
+            output_data, trace = infer_and_capture_trace(input_data)
+            traces_to_avg[j] = trace
+            outputs_before_avg[j] = output_data
 
-    traces[i] = trace
-    outputs[i] = output_data
+        if not all(e == outputs_before_avg[0] for e in outputs_before_avg[1:]):
+            print("Warning: Outputs before averaging are not identical!")
+    
+        traces[i] = np.average(traces_to_avg, axis=0)
+        outputs[i] = outputs_before_avg[0]
 
 
-np.save(capture_dir + "/inputs.npy", inputs)
-np.save(capture_dir + "/outputs.npy", outputs)
-np.save(capture_dir + "/traces.npy", traces)
+np.save(capture_path_prefix + "_inputs.npy", inputs)
+np.save(capture_path_prefix + "_outputs.npy", outputs)
+np.save(capture_path_prefix + "_traces.npy", traces)
 
-plt.plot(np.average(traces, axis=0))
+#plt.plot(np.average(traces, axis=0))
+plt.plot(traces[0])
 
 
 #
@@ -233,4 +261,4 @@ plt.plot(np.average(traces, axis=0))
 hw.disconnect()
 
 
-plt.show()
+#plt.show()
