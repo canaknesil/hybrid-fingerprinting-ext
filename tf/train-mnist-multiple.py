@@ -11,7 +11,9 @@ import math
 import numpy as np
 
 
-model_file_prefix = "models/mnist"
+model_file_prefix = sys.argv[1]
+print("model_file_prefix:", model_file_prefix)
+
 
 # Dataset is devided into independent parts, each part consisting a
 # training and testing data, a model being trained for each

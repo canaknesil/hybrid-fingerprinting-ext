@@ -1,0 +1,101 @@
+# This makefile is not used for building. It specifies the available scripts and their interaction.
+
+
+# Workspace W is where the input files to the available scripts should
+# be and the output files will be produced.
+W = workspace
+$(info Workspace: $(W))
+
+
+MODEL_NAME = mnist
+X_SIZE = 7
+Y_SIZE = 7
+INDEP = 0
+INIT = 0
+MNIST_MODEL = $(MODEL_NAME)_$(X_SIZE)x$(Y_SIZE)
+
+MODEL := $(MNIST_MODEL)
+MODEL_MULTI := $(MODEL)_indep-$(INDEP)_init-$(INIT)
+X_TEST := $(MODEL)_indep-$(INDEP)_x_test.npy
+Y_TEST := $(MODEL)_indep-$(INDEP)_y_test.npy
+
+MODEL := $(MODEL_MULTI)
+HEX := $(MODEL)_ss-tflite-CW308_STM32F4
+TRACES_PREFIX := $(HEX)
+INPUTS := $(TRACES_PREFIX)_inputs.npy
+OUTPUTS := $(TRACES_PREFIX)_outputs.npy
+TRACES := $(TRACES_PREFIX)_traces.npy
+TRACE_SETS := $(TRACES_PREFIX)_traces.npy $(TRACES_PREFIX)_2_traces.npy
+
+
+define print_target_info
+	@echo
+	@echo "Target: $@"
+	@echo "Parameters:"
+	@for s in $(foreach v,$(3),"$(v): $($(v))"); do echo "  $$s"; done
+	@echo "Input files:"
+	@for i in $(1); do echo "  $$i"; done
+	@echo "Output files:"
+	@for i in $(2); do echo "  $$i"; done
+endef
+
+define command
+	@echo Command:
+	@echo -n "  "
+	@echo $(1)
+endef
+
+
+
+.PHONY: default all train_mnist modify_model test_model convert_model_to_tflite compile_firmware capture verify_inference compare_traces
+
+default:
+	@echo "This makefile is not used for building. It specifies the available scripts and their interaction."
+
+
+all: train_mnist train_mnist_multiple modify_model test_model convert_model_to_tflite compile_firmware capture verify_inference compare_traces
+
+
+train_mnist:
+	$(call print_target_info,,$(W)/$(MNIST_MODEL) $(W)/$(MNIST_MODEL).keras,MODEL_NAME)
+	$(call command,ipython tf/train-mnist.py $(W)/$(MODEL_NAME))
+
+
+train_mnist_multiple:
+	$(call print_target_info,,$(shell bash -c "echo $(W)/$(MNIST_MODEL)_indep-{0..1}_{x,y}_{train,test}.npy") $(shell bash -c "echo $(W)/$(MNIST_MODEL)_indep-{0..1}_init-{0..1}{.keras,}"),MODEL_NAME)
+	$(call command,ipython tf/train-mnist-multiple.py $(W)/$(MODEL_NAME))
+
+
+modify_model:
+	$(call print_target_info,$(W)/$(MODEL).keras,$(shell bash -c "echo $(W)/$(MODEL)_snr-{1000,100,10}{.keras,}"),MODEL)
+	$(call command,ipython tf/modify-model.py $(W)/$(MODEL))
+
+
+test_model:
+	$(call print_target_info,$(W)/$(MODEL).keras $(W)/$(X_TEST) $(W)/$(Y_TEST),,MODEL X_TEST Y_TEST)
+	$(call command,ipython tf/test_model.py $(W)/$(MODEL) $(W)/$(X_TEST) $(W)/$(Y_TEST))
+
+
+convert_model_to_tflite:
+	$(call print_target_info,$(W)/$(MODEL) $(W)/$(MODEL).keras,$(W)/$(MODEL).tflite,MODEL)
+	$(call command,ipython tf/convert-model-to-tflite.py $(W)/$(MODEL))
+
+
+compile_firmware:
+	$(call print_target_info,$(W)/$(MODEL).tflite,$(W)/$(HEX).hex,MODEL)
+	$(call command,bash firmware/simpleserial-tflite/compile_with_model.sh $(W)/$(MODEL).tflite)
+
+
+capture:
+	$(call print_target_info,$(W)/$(HEX).hex $(W)/$(X_TEST),$(W)/$(TRACES_PREFIX)_inputs.npy $(W)/$(TRACES_PREFIX)_outputs.npy $(W)/$(TRACES_PREFIX)_traces.npy,HEX X_TEST TRACES_PREFIX)
+	$(call command,ipython capture/capture-ss-tflite.py $(W)/$(HEX).hex $(W)/$(X_TEST) $(W)/$(TRACES_PREFIX))
+
+
+verify_inference:
+	$(call print_target_info,$(W)/$(MODEL).tflite $(W)/$(INPUTS) $(W)/$(OUTPUTS),,MODEL INPUTS OUTPUTS)
+	$(call command,ipython tf/infer-model-and-compare.py $(W)/$(MODEL).tflite $(W)/$(INPUTS) $(W)/$(OUTPUTS))
+
+
+compare_traces:
+	$(call print_target_info,$(foreach s,$(TRACE_SETS),$(W)/$(s)),,TRACE_SETS)
+	$(call command,ipython sca/compare-traces.py $(foreach s,$(TRACE_SETS),$(W)/$(s)))

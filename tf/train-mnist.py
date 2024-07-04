@@ -9,7 +9,8 @@ import sys
 import util
 
 
-model_file_prefix = "models/mnist"
+model_file_prefix = sys.argv[1]
+print("model_file_prefix:", model_file_prefix)
 
 
 (x_train, y_train), (x_test, y_test) = mnist.load_data()
