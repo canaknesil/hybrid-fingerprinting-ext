@@ -1,0 +1,65 @@
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
+import tensorflow as tf
+import sys
+import util
+import numpy as np
+
+
+model_prefix = util.remove_trailing_slash(sys.argv[1])    
+dataset_prefix = sys.argv[2]
+
+print("model_prefix:", model_prefix)
+print("dataset_prefix:", dataset_prefix)
+
+
+x_train = np.load(dataset_prefix + "_x_train.npy")
+y_train = np.load(dataset_prefix + "_y_train.npy")
+x_test = np.load(dataset_prefix + "_x_test.npy")
+y_test = np.load(dataset_prefix + "_y_test.npy")
+
+print("x_train.shape:", x_train.shape)
+print("y_train.shape:", y_train.shape)
+print("x_test.shape:", x_test.shape)
+print("y_test.shape:", y_test.shape)
+
+keras_model = model_prefix + ".keras"
+victim_model = tf.keras.models.load_model(keras_model)
+print("Victim model summary:")
+victim_model.summary()
+
+y_train_from_victim = victim_model.predict(x_train)
+print("y_train_from_victim.shape:", y_train_from_victim.shape)
+
+y_train_victim_file = f"{dataset_prefix}_y_train_from_victim.npy"
+print(f"Saving y_train_from_victim to {y_train_victim_file}.")
+np.save(y_train_victim_file, y_train_from_victim)
+
+
+def new_model_like(model):
+    model_json = model.to_json()
+    new_model = tf.keras.models.model_from_json(model_json)
+    #model_config = model.get_config()
+    #new_model = tf.keras.Model.from_config(model_config)
+    return new_model
+
+
+model = new_model_like(victim_model)
+
+model.compile(optimizer='SGD', # adam has a log of parameters
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+#model.summary()
+
+model.fit(x_train, y_train_from_victim, epochs=20, batch_size=32, validation_split=0.2)
+
+test_loss, test_acc = model.evaluate(x_test, y_test)
+print(f'Test accuracy: {test_acc}')
+
+test_loss_victim, test_acc_victim = victim_model.evaluate(x_test, y_test)
+print(f'Victim test accuracy: {test_acc_victim}')
+
+util.save_model(model, model_prefix + "_retrained")
+
+
+

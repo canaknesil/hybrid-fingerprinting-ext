@@ -18,10 +18,16 @@ MODEL := $(MNIST_MODEL)
 MODEL_MULTI := $(MODEL)_indep-$(INDEP)_init-$(INIT)
 X_TEST := $(MODEL)_indep-$(INDEP)_x_test.npy
 Y_TEST := $(MODEL)_indep-$(INDEP)_y_test.npy
+RETRAIN_DATASET_PREFIX := $(MODEL)_indep-1
+
+ORIGINAL := $(MODEL)_indep-0_init-0_ss-tflite-CW308_STM32F4
+SUSPECT := $(MODEL)_indep-0_init-0_snr-100_ss-tflite-CW308_STM32F4
+THIRD := $(MODEL)_indep-1_init-0_ss-tflite-CW308_STM32F4
 
 MODEL := $(MODEL_MULTI)
-HEX := $(MODEL)_ss-tflite-CW308_STM32F4
-TRACES_PREFIX := $(HEX)
+HEX_PREFIX := $(MODEL)_ss-tflite-CW308_STM32F4
+HEX := $(HEX_PREFIX).hex
+TRACES_PREFIX := $(HEX_PREFIX)
 INPUTS := $(TRACES_PREFIX)_inputs.npy
 OUTPUTS := $(TRACES_PREFIX)_outputs.npy
 TRACES := $(TRACES_PREFIX)_traces.npy
@@ -47,13 +53,13 @@ endef
 
 
 
-.PHONY: default all train_mnist modify_model test_model convert_model_to_tflite compile_firmware capture verify_inference compare_traces
+.PHONY: default all train_mnist modify_model test_model convert_model_to_tflite compile_firmware capture verify_inference compare_traces retrain detect_stolen
 
 default:
 	@echo "This makefile is not used for building. It specifies the available scripts and their interaction."
 
 
-all: train_mnist train_mnist_multiple modify_model test_model convert_model_to_tflite compile_firmware capture verify_inference compare_traces
+all: train_mnist train_mnist_multiple modify_model test_model convert_model_to_tflite compile_firmware capture verify_inference compare_traces retrain detect_stolen
 
 
 train_mnist:
@@ -82,13 +88,13 @@ convert_model_to_tflite:
 
 
 compile_firmware:
-	$(call print_target_info,$(W)/$(MODEL).tflite,$(W)/$(HEX).hex,MODEL)
+	$(call print_target_info,$(W)/$(MODEL).tflite,$(W)/$(HEX),MODEL)
 	$(call command,bash firmware/simpleserial-tflite/compile_with_model.sh $(W)/$(MODEL).tflite)
 
 
 capture:
-	$(call print_target_info,$(W)/$(HEX).hex $(W)/$(X_TEST),$(W)/$(TRACES_PREFIX)_inputs.npy $(W)/$(TRACES_PREFIX)_outputs.npy $(W)/$(TRACES_PREFIX)_traces.npy,HEX X_TEST TRACES_PREFIX)
-	$(call command,ipython capture/capture-ss-tflite.py $(W)/$(HEX).hex $(W)/$(X_TEST) $(W)/$(TRACES_PREFIX))
+	$(call print_target_info,$(W)/$(HEX) $(W)/$(X_TEST),$(W)/$(TRACES_PREFIX)_inputs.npy $(W)/$(TRACES_PREFIX)_outputs.npy $(W)/$(TRACES_PREFIX)_traces.npy,HEX X_TEST TRACES_PREFIX)
+	$(call command,ipython capture/capture-ss-tflite.py $(W)/$(HEX) $(W)/$(X_TEST) $(W)/$(TRACES_PREFIX))
 
 
 verify_inference:
@@ -99,3 +105,13 @@ verify_inference:
 compare_traces:
 	$(call print_target_info,$(foreach s,$(TRACE_SETS),$(W)/$(s)),,TRACE_SETS)
 	$(call command,ipython sca/compare-traces.py $(foreach s,$(TRACE_SETS),$(W)/$(s)))
+
+
+retrain:
+	$(call print_target_info,$(W)/$(MODEL).keras $(shell bash -c "echo $(W)/$(RETRAIN_DATASET_PREFIX)_{x,y}_{train,test}.npy"),$(W)/$(MODEL)_retrained $(W)/$(MODEL)_retrained.keras $(W)/$(RETRAIN_DATASET_PREFIX)_y_train_from_victim.npy,MODEL RETRAIN_DATASET_PREFIX)
+	$(call command,ipython tf/retrain.py $(W)/$(MODEL) $(W)/$(RETRAIN_DATASET_PREFIX))
+
+
+detect_stolen:
+	$(call print_target_info,$(W)/$(ORIGINAL)_outputs.npy $(W)/$(SUSPECT)_outputs.npy $(W)/$(THIRD)_outputs.npy $(W)/$(Y_TEST),,ORIGINAL SUSPECT THIRD Y_TEST)
+	$(call command,ipython sca/detect-stolen-model.py $(W)/$(ORIGINAL) $(W)/$(SUSPECT) $(W)/$(THIRD) $(W)/$(Y_TEST))
