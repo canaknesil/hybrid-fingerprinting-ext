@@ -14,7 +14,7 @@ if [ "$EXT" != "tflite" ]; then
     exit
 fi
 
-NEW_HEX="${MODEL%.tflite}_ss-tflite-CW308_STM32F4.hex"
+NEW_HEX="${MODEL%.tflite}.hex"
 echo Creating $NEW_HEX...
 echo
 

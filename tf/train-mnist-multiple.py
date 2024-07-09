@@ -18,7 +18,7 @@ print("model_file_prefix:", model_file_prefix)
 # Dataset is devided into independent parts, each part consisting a
 # training and testing data, a model being trained for each
 # independent part.
-n_indep_model = 2
+n_indep_model = 3
 
 # Number of models trained with different sets of initial weights
 # using a single dataset part.
@@ -45,8 +45,8 @@ y_test = to_categorical(y_test, 10)
 
 
 def split(arr, n, i):
-    start = math.floor(i * len(arr) / n)
-    end = math.floor((i+1) * len(arr) / n)
+    start = i * (len(arr) // n)
+    end = (i + 1) * (len(arr) // n)
     #print(f"dataset from {start} to {end}")
     return arr[start:end]
 

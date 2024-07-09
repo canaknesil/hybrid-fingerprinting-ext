@@ -34,7 +34,7 @@ test_data = test_data[:num_traces]
 # Scope settings
 n_samples = 24400 # For CW Lite, default=5000, max=24400
 adc_clk_src = 'clkgen_x1'
-decimation = 4 # ADC downsampling factor, sampling rate is 1/decimation of the sampling clock
+decimation = 1 # ADC downsampling factor, sampling rate is 1/decimation of the sampling clock
 
 # Invocation of hello_world_float.tflite takes 40.000 clock cycles.
 #               mnist_model.tflite             80.000
@@ -205,12 +205,21 @@ assert list(test_data.shape[1:]) == list(input_shape[1:])
 assert test_data.dtype == input_type_np
 
 
-print("Capturing warming-up traces.")
-for i in range(3):
-    #input_data = np.full(input_shape, 0.5, dtype=input_type_np)
-    input_data = np.random.rand(*input_shape).astype(input_type_np)
+n_warmup_traces = 10
+print(f"Capturing {n_warmup_traces} warming-up traces.")
+
+warmup_traces = np.zeros([n_warmup_traces, n_samples], dtype=np.float64)
+for i in range(n_warmup_traces):
+    input_data = np.full(input_shape, 0.5, dtype=input_type_np)
+    #input_data = np.random.rand(*input_shape).astype(input_type_np)
 
     output_data, trace = infer_and_capture_trace(input_data)
+    warmup_traces[i] = trace
+
+#plt.figure()
+#plt.plot(np.average(warmup_traces, axis=0))
+#plt.show()
+#sys.exit()
 
 
 inputs = np.zeros([num_traces] + input_shape, dtype=input_type_np)
@@ -248,6 +257,7 @@ np.save(capture_path_prefix + "_inputs.npy", inputs)
 np.save(capture_path_prefix + "_outputs.npy", outputs)
 np.save(capture_path_prefix + "_traces.npy", traces)
 
+plt.figure()
 #plt.plot(np.average(traces, axis=0))
 plt.plot(traces[0])
 

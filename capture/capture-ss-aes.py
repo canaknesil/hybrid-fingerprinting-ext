@@ -43,6 +43,9 @@ else:
 
 time.sleep(0.05)
 scope.default_setup()
+#scope.adc.samples = 24400 # 24400 is max for CWLITE
+#scope.adc.decimate = 4
+#scope.clock.adc_src = "clkgen_x1"
 
 
 def reset_target(scope):

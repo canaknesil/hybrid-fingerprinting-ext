@@ -20,12 +20,12 @@ X_TEST := $(MODEL)_indep-$(INDEP)_x_test.npy
 Y_TEST := $(MODEL)_indep-$(INDEP)_y_test.npy
 RETRAIN_DATASET_PREFIX := $(MODEL)_indep-1
 
-ORIGINAL := $(MODEL)_indep-0_init-0_ss-tflite-CW308_STM32F4
-SUSPECT := $(MODEL)_indep-0_init-0_snr-100_ss-tflite-CW308_STM32F4
-THIRD := $(MODEL)_indep-1_init-0_ss-tflite-CW308_STM32F4
+ORIGINAL := $(MODEL)_indep-0_init-0
+SUSPECT := $(MODEL)_indep-0_init-0_snr-100
+THIRD := $(MODEL)_indep-1_init-0
 
 MODEL := $(MODEL_MULTI)
-HEX_PREFIX := $(MODEL)_ss-tflite-CW308_STM32F4
+HEX_PREFIX := $(MODEL)
 HEX := $(HEX_PREFIX).hex
 TRACES_PREFIX := $(HEX_PREFIX)
 INPUTS := $(TRACES_PREFIX)_inputs.npy
@@ -53,13 +53,13 @@ endef
 
 
 
-.PHONY: default all train_mnist modify_model test_model convert_model_to_tflite compile_firmware capture verify_inference compare_traces retrain detect_stolen
+.PHONY: default all train_mnist modify_model retrain test_model convert_model_to_tflite compile_firmware capture verify_inference compare_traces detect_stolen
 
 default:
 	@echo "This makefile is not used for building. It specifies the available scripts and their interaction."
 
 
-all: train_mnist train_mnist_multiple modify_model test_model convert_model_to_tflite compile_firmware capture verify_inference compare_traces retrain detect_stolen
+all: train_mnist train_mnist_multiple modify_model retrain test_model convert_model_to_tflite compile_firmware capture verify_inference compare_traces detect_stolen
 
 
 train_mnist:
@@ -68,13 +68,18 @@ train_mnist:
 
 
 train_mnist_multiple:
-	$(call print_target_info,,$(shell bash -c "echo $(W)/$(MNIST_MODEL)_indep-{0..1}_{x,y}_{train,test}.npy") $(shell bash -c "echo $(W)/$(MNIST_MODEL)_indep-{0..1}_init-{0..1}{.keras,}"),MODEL_NAME)
+	$(call print_target_info,,$(shell bash -c "echo $(W)/$(MNIST_MODEL)_indep-{0..2}_{x,y}_{train,test}.npy") $(shell bash -c "echo $(W)/$(MNIST_MODEL)_indep-{0..2}_init-{0..1}{.keras,}"),MODEL_NAME)
 	$(call command,ipython tf/train-mnist-multiple.py $(W)/$(MODEL_NAME))
 
 
 modify_model:
 	$(call print_target_info,$(W)/$(MODEL).keras,$(shell bash -c "echo $(W)/$(MODEL)_snr-{1000,100,10}{.keras,}"),MODEL)
 	$(call command,ipython tf/modify-model.py $(W)/$(MODEL))
+
+
+retrain:
+	$(call print_target_info,$(W)/$(MODEL).keras $(shell bash -c "echo $(W)/$(RETRAIN_DATASET_PREFIX)_{x,y}_{train,test}.npy"),$(W)/$(MODEL)_retrained $(W)/$(MODEL)_retrained.keras $(W)/$(RETRAIN_DATASET_PREFIX)_y_train_from_victim.npy,MODEL RETRAIN_DATASET_PREFIX)
+	$(call command,ipython tf/retrain.py $(W)/$(MODEL) $(W)/$(RETRAIN_DATASET_PREFIX))
 
 
 test_model:
@@ -105,11 +110,6 @@ verify_inference:
 compare_traces:
 	$(call print_target_info,$(foreach s,$(TRACE_SETS),$(W)/$(s)),,TRACE_SETS)
 	$(call command,ipython sca/compare-traces.py $(foreach s,$(TRACE_SETS),$(W)/$(s)))
-
-
-retrain:
-	$(call print_target_info,$(W)/$(MODEL).keras $(shell bash -c "echo $(W)/$(RETRAIN_DATASET_PREFIX)_{x,y}_{train,test}.npy"),$(W)/$(MODEL)_retrained $(W)/$(MODEL)_retrained.keras $(W)/$(RETRAIN_DATASET_PREFIX)_y_train_from_victim.npy,MODEL RETRAIN_DATASET_PREFIX)
-	$(call command,ipython tf/retrain.py $(W)/$(MODEL) $(W)/$(RETRAIN_DATASET_PREFIX))
 
 
 detect_stolen:
