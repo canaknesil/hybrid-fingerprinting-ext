@@ -15,7 +15,7 @@ fw_path = sys.argv[1]
 input_data_path = sys.argv[2]
 capture_path_prefix = sys.argv[3]
 
-num_traces = 1000
+num_traces = 2000
 avg_factor = 1
 
 print("PLATFORM:", PLATFORM)

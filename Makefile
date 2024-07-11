@@ -8,6 +8,7 @@ W = workspace
 $(info Workspace: $(W))
 
 
+EMNIST_DIR = ../emnist/gzip
 MODEL_NAME = mnist
 X_SIZE = 7
 Y_SIZE = 7
@@ -20,6 +21,7 @@ MODEL_MULTI := $(MODEL)_indep-$(INDEP)_init-$(INIT)
 X_TEST := $(MODEL)_indep-$(INDEP)_x_test.npy
 Y_TEST := $(MODEL)_indep-$(INDEP)_y_test.npy
 RETRAIN_DATASET_PREFIX := $(MODEL)_indep-1
+RETRAINED_MODEL := $(MODEL_MULTI)_retrained_ds-1
 RAND_DATASET_PREFIX := $(MODEL)_rand
 
 ORIGINAL := $(MODEL)_indep-0_init-0
@@ -65,12 +67,12 @@ all: train_mnist train_mnist_multiple modify_model retrain test_model convert_mo
 
 train_mnist:
 	$(call print_target_info,,$(W)/$(MNIST_MODEL) $(W)/$(MNIST_MODEL).keras,MODEL_NAME)
-	$(call command,ipython tf/train-mnist.py $(W)/$(MODEL_NAME))
+	$(call command,ipython tf/train-mnist.py $(W)/$(MODEL_NAME)) $(EMNIST_DIR)
 
 
 train_mnist_multiple:
-	$(call print_target_info,,$(shell bash -c "echo $(W)/$(MNIST_MODEL)_indep-{0..2}_{x,y}_{train,test}.npy") $(shell bash -c "echo $(W)/$(MNIST_MODEL)_indep-{0..2}_init-{0..1}{.keras,}"),MODEL_NAME)
-	$(call command,ipython tf/train-mnist-multiple.py $(W)/$(MODEL_NAME))
+	$(call print_target_info,$(EMNIST_DIR)/emnist-digits-train-images-idx3-ubyte $(EMNIST_DIR)/emnist-digits-train-labels-idx1-ubyte $(EMNIST_DIR)/emnist-digits-test-images-idx3-ubyte $(EMNIST_DIR)/emnist-digits-test-labels-idx1-ubyte,$(shell bash -c "echo $(W)/$(MNIST_MODEL)_indep-{0..11}_{x,y}_{train,test}.npy") $(shell bash -c "echo $(W)/$(MNIST_MODEL)_indep-{0..11}_init-{0..1}{.keras,}"),MODEL_NAME EMNIST_DIR)
+	$(call command,ipython tf/train-mnist-multiple.py $(W)/$(MODEL_NAME) $(EMNIST_DIR))
 
 
 modify_model:
@@ -79,8 +81,8 @@ modify_model:
 
 
 retrain:
-	$(call print_target_info,$(W)/$(MODEL).keras $(shell bash -c "echo $(W)/$(RETRAIN_DATASET_PREFIX)_{x,y}_{train,test}.npy"),$(W)/$(MODEL)_retrained $(W)/$(MODEL)_retrained.keras $(W)/$(RETRAIN_DATASET_PREFIX)_y_train_from_victim.npy,MODEL RETRAIN_DATASET_PREFIX)
-	$(call command,ipython tf/retrain.py $(W)/$(MODEL) $(W)/$(RETRAIN_DATASET_PREFIX))
+	$(call print_target_info,$(W)/$(MODEL).keras $(shell bash -c "echo $(W)/$(RETRAIN_DATASET_PREFIX)_{x,y}_{train,test}.npy"),$(W)/$(RETRAINED_MODEL) $(W)/$(RETRAINED_MODEL).keras $(W)/$(RETRAIN_DATASET_PREFIX)_y_train_from_victim.npy,MODEL RETRAIN_DATASET_PREFIX RETRAINED_MODEL)
+	$(call command,ipython tf/retrain.py $(W)/$(MODEL) $(W)/$(RETRAIN_DATASET_PREFIX) $(W)/$(RETRAINED_MODEL)) 
 
 
 test_model:

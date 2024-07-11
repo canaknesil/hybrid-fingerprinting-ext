@@ -1,7 +1,7 @@
 import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 import tensorflow as tf
-from tensorflow.keras.datasets import mnist
+#from tensorflow.keras.datasets import mnist
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Dense, Flatten
 from tensorflow.keras.utils import to_categorical
@@ -9,16 +9,20 @@ import sys
 import util
 import math
 import numpy as np
+import idx2numpy as idx
 
 
 model_file_prefix = sys.argv[1]
+emnist_dir = sys.argv[2]
+
 print("model_file_prefix:", model_file_prefix)
+print("emnist_dir:", emnist_dir)
 
 
 # Dataset is devided into independent parts, each part consisting a
 # training and testing data, a model being trained for each
 # independent part.
-n_indep_model = 3
+n_indep_model = 12
 
 # Number of models trained with different sets of initial weights
 # using a single dataset part.
@@ -27,7 +31,31 @@ n_init_state = 2
 print(f"Training with {n_indep_model} independent datasets, starting from {n_init_state} different initial states.")
 
 
-(x_train, y_train), (x_test, y_test) = mnist.load_data()
+# MNIST
+#(x_train, y_train), (x_test, y_test) = mnist.load_data()
+
+# EMNIST
+# Using tensorflow_datasets gave an error.
+# Loading from dataset that is manually downloaded from https://biometrics.nist.gov/cs_links/EMNIST/gzip.zip
+x_train = idx.convert_from_file(emnist_dir + "/emnist-digits-train-images-idx3-ubyte")
+y_train = idx.convert_from_file(emnist_dir + "/emnist-digits-train-labels-idx1-ubyte")
+x_test = idx.convert_from_file(emnist_dir + "/emnist-digits-test-images-idx3-ubyte")
+y_test = idx.convert_from_file(emnist_dir + "/emnist-digits-test-labels-idx1-ubyte")
+
+idx = np.array(range(x_train.shape[0]))
+np.random.shuffle(idx)
+x_train = x_train[idx,:]
+y_train = y_train[idx]
+idx = np.array(range(x_test.shape[0]))
+np.random.shuffle(idx)
+x_test = x_test[idx]
+y_test = y_test[idx]
+
+print("x_train.shape:", x_train.shape)
+print("y_train.shape:", y_train.shape)
+print("x_test.shape:", x_test.shape)
+print("y_test.shape:", y_test.shape)
+
 
 # Normalize the images to [0, 1] range
 x_train = x_train.astype('float32') / 255
@@ -77,7 +105,7 @@ for i in range(n_indep_model):
             model.summary()
 
         print(f"Training model {i}-{j}")
-        model.fit(x_train_part, y_train_part, epochs=20, batch_size=32, validation_split=0.2)
+        model.fit(x_train_part, y_train_part, epochs=85, batch_size=32, validation_split=0.2)
 
         test_loss, test_acc = model.evaluate(x_test_part, y_test_part)
         print(f'Test accuracy: {test_acc}')

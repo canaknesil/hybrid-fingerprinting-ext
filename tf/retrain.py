@@ -8,9 +8,14 @@ import numpy as np
 
 model_prefix = util.remove_trailing_slash(sys.argv[1])    
 dataset_prefix = sys.argv[2]
+retrained_model_prefix = util.remove_trailing_slash(sys.argv[3])
 
 print("model_prefix:", model_prefix)
 print("dataset_prefix:", dataset_prefix)
+print("retrained_model_prefix:", retrained_model_prefix)
+
+
+n_init_state = 2
 
 
 x_train = np.load(dataset_prefix + "_x_train.npy")
@@ -44,22 +49,23 @@ def new_model_like(model):
     return new_model
 
 
-model = new_model_like(victim_model)
+for i in range(n_init_state):
+    model = new_model_like(victim_model)
 
-model.compile(optimizer='SGD', # adam has a log of parameters
-              loss='categorical_crossentropy',
-              metrics=['accuracy'])
-#model.summary()
+    model.compile(optimizer='SGD', # adam has a log of parameters
+                  loss='categorical_crossentropy',
+                  metrics=['accuracy'])
+    #model.summary()
 
-model.fit(x_train, y_train_from_victim, epochs=20, batch_size=32, validation_split=0.2)
+    model.fit(x_train, y_train_from_victim, epochs=85, batch_size=32, validation_split=0.2)
 
-test_loss, test_acc = model.evaluate(x_test, y_test)
-print(f'Test accuracy: {test_acc}')
+    test_loss, test_acc = model.evaluate(x_test, y_test)
+    print(f'Test accuracy: {test_acc}')
 
-test_loss_victim, test_acc_victim = victim_model.evaluate(x_test, y_test)
-print(f'Victim test accuracy: {test_acc_victim}')
+    test_loss_victim, test_acc_victim = victim_model.evaluate(x_test, y_test)
+    print(f'Victim test accuracy: {test_acc_victim}')
 
-util.save_model(model, model_prefix + "_retrained")
+    util.save_model(model, f"{retrained_model_prefix}_init-{i}")
 
 
 
