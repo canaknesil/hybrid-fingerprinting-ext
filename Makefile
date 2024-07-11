@@ -1,4 +1,5 @@
-# This makefile is not used for building. It specifies the available scripts and their interaction.
+# This makefile is not used for building. It prints information about
+# the available scripts and their usage.
 
 
 # Workspace W is where the input files to the available scripts should
@@ -19,6 +20,7 @@ MODEL_MULTI := $(MODEL)_indep-$(INDEP)_init-$(INIT)
 X_TEST := $(MODEL)_indep-$(INDEP)_x_test.npy
 Y_TEST := $(MODEL)_indep-$(INDEP)_y_test.npy
 RETRAIN_DATASET_PREFIX := $(MODEL)_indep-1
+RAND_DATASET_PREFIX := $(MODEL)_rand
 
 ORIGINAL := $(MODEL)_indep-0_init-0
 SUSPECT := $(MODEL)_indep-0_init-0_snr-100
@@ -31,7 +33,6 @@ TRACES_PREFIX := $(HEX_PREFIX)
 INPUTS := $(TRACES_PREFIX)_inputs.npy
 OUTPUTS := $(TRACES_PREFIX)_outputs.npy
 TRACES := $(TRACES_PREFIX)_traces.npy
-TRACE_SETS := $(TRACES_PREFIX)_traces.npy $(TRACES_PREFIX)_2_traces.npy
 
 
 define print_target_info
@@ -53,13 +54,13 @@ endef
 
 
 
-.PHONY: default all train_mnist modify_model retrain test_model convert_model_to_tflite compile_firmware capture verify_inference compare_traces detect_stolen
+.PHONY: default all train_mnist modify_model retrain test_model convert_model_to_tflite compile_firmware gen_rand_mnist_data capture verify_inference compare_models detect_stolen
 
 default:
-	@echo "This makefile is not used for building. It specifies the available scripts and their interaction."
+	@echo "This makefile is not used for building. It prints information about the available scripts and their usage."
 
 
-all: train_mnist train_mnist_multiple modify_model retrain test_model convert_model_to_tflite compile_firmware capture verify_inference compare_traces detect_stolen
+all: train_mnist train_mnist_multiple modify_model retrain test_model convert_model_to_tflite compile_firmware gen_rand_mnist_data capture verify_inference compare_models detect_stolen
 
 
 train_mnist:
@@ -97,6 +98,11 @@ compile_firmware:
 	$(call command,bash firmware/simpleserial-tflite/compile_with_model.sh $(W)/$(MODEL).tflite)
 
 
+gen_rand_mnist_data:
+	$(call print_target_info,,$(W)/$(RAND_DATASET_PREFIX)_x_test.npy,RAND_DATASET_PREFIX)
+	$(call command,ipython tf/gen-rand-mnist-test-data.py $(W)/$(RAND_DATASET_PREFIX))
+
+
 capture:
 	$(call print_target_info,$(W)/$(HEX) $(W)/$(X_TEST),$(W)/$(TRACES_PREFIX)_inputs.npy $(W)/$(TRACES_PREFIX)_outputs.npy $(W)/$(TRACES_PREFIX)_traces.npy,HEX X_TEST TRACES_PREFIX)
 	$(call command,ipython capture/capture-ss-tflite.py $(W)/$(HEX) $(W)/$(X_TEST) $(W)/$(TRACES_PREFIX))
@@ -107,9 +113,9 @@ verify_inference:
 	$(call command,ipython tf/infer-model-and-compare.py $(W)/$(MODEL).tflite $(W)/$(INPUTS) $(W)/$(OUTPUTS))
 
 
-compare_traces:
-	$(call print_target_info,$(foreach s,$(TRACE_SETS),$(W)/$(s)),,TRACE_SETS)
-	$(call command,ipython sca/compare-traces.py $(foreach s,$(TRACE_SETS),$(W)/$(s)))
+compare_models:
+	$(call print_target_info,$(W)/$(ORIGINAL)_outputs.npy $(W)/$(ORIGINAL)_traces.npy $(W)/$(SUSPECT)_outputs.npy $(W)/$(SUSPECT)_traces.npy $(W)/$(Y_TEST),,ORIGINAL SUSPECT Y_TEST)
+	$(call command,ipython sca/compare-models.py $(W)/$(ORIGINAL) $(W)/$(SUSPECT) $(W)/$(Y_TEST))
 
 
 detect_stolen:

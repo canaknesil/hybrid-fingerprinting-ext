@@ -61,6 +61,21 @@ def ttest(a, b):
     return st.ttest_ind(a, b).statistic
 
 
+def correlation(traces_a, traces_b):
+    # traces [observation, variable]
+    corr = np.zeros(traces_a.shape[-1])
+    for v in range(traces_a.shape[-1]):
+        corr[v] = np.corrcoef(traces_a[:,v], traces_b[:,v])[0,1]
+    return corr
+
+
+def flat_correlation(traces_a, traces_b):
+    traces_a = traces_a.flatten()
+    traces_b = traces_b.flatten()
+    corr = np.corrcoef(traces_a, traces_b)[0,1]
+    return corr
+
+
 def pdf(samples, x=None):
     if x is None:
         x = np.linspace(samples.min(), samples.max(), 100)
@@ -199,6 +214,23 @@ plt.figure()
 plt.plot(overlap_original_vs_suspect)
 plt.title("Overlap of Original and Suspect")
 plt.ylim(0, 1)
+
+print("T-test between original and suspect model:")
+ttest_original_vs_suspect = ttest(traces_original, traces_suspect)
+
+plt.figure()
+plt.plot(ttest_original_vs_suspect)
+plt.title("T-test between Original and Suspect")
+
+print("Correlation between original and suspect model:")
+corr_original_vs_suspect = correlation(traces_original, traces_suspect)
+
+plt.figure()
+plt.plot(corr_original_vs_suspect)
+plt.title("Correlation between original and suspect model")
+plt.ylim(-1, 1)
+
+print("Correlation between flattened versions of original and suspect model:", flat_correlation(traces_original, traces_suspect))
 
 
 print("\nUsing only inputs where the original model produce incorrect predictions, together with significant trace points.")
