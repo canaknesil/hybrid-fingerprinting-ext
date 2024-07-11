@@ -8,12 +8,10 @@ from tqdm import tqdm
 
 original_prefix = sys.argv[1]
 suspect_prefix = sys.argv[2]
-third_prefix = sys.argv[3]
-correct_outputs_file = sys.argv[4]
+correct_outputs_file = sys.argv[3]
 
 print("original_prefix:", original_prefix)
 print("suspect_prefix:", suspect_prefix)
-print("third_prefix:", third_prefix)
 print("correct_outputs_file:", correct_outputs_file)
 
 
@@ -96,18 +94,15 @@ def overlap_between_traces(traces_a, traces_b):
 
 outputs_original = np.load(original_prefix + "_outputs.npy")
 outputs_suspect = np.load(suspect_prefix + "_outputs.npy")
-outputs_third = np.load(third_prefix + "_outputs.npy")
 correct_outputs = np.load(correct_outputs_file)
 
 print("outputs_original.shape:", outputs_original.shape)
 print("outputs_suspect.shape:", outputs_suspect.shape)
-print("outputs_third.shape:", outputs_third.shape)
 print("correct_outputs.shape:", correct_outputs.shape)
 
 print("Removing dimensions of size 1.")
 outputs_original = np.squeeze(outputs_original)
 outputs_suspect = np.squeeze(outputs_suspect)
-outputs_third = np.squeeze(outputs_third)
 correct_outputs = np.squeeze(correct_outputs)
 
 
@@ -116,7 +111,7 @@ if outputs_original.shape[0] < correct_outputs.shape[0]:
     print("Warning: Traces were collected from a subset of test data. Choping test data.")
     correct_outputs = correct_outputs[:outputs_original.shape[0],:]
 
-outputs_list = [outputs_original, outputs_suspect, outputs_third, correct_outputs]
+outputs_list = [outputs_original, outputs_suspect, correct_outputs]
 for x in outputs_list[1:]:
     assert x.shape == outputs_list[0].shape
 
@@ -124,24 +119,22 @@ for x in outputs_list[1:]:
 logits_list = outputs_list
 outputs_list = list(map(logits_to_predictions, outputs_list))
 
-outputs_original, outputs_suspect, outputs_third, correct_outputs = outputs_list
-logits_original, logits_suspect, logits_third, logits_correct = logits_list
+outputs_original, outputs_suspect, correct_outputs = outputs_list
+logits_original, logits_suspect, logits_correct = logits_list
 
 
 traces_original = np.load(original_prefix + "_traces.npy")
 traces_suspect = np.load(suspect_prefix + "_traces.npy")
-traces_third = np.load(third_prefix + "_traces.npy")
 
 print("traces_original.shape:", traces_original.shape)
 print("traces_suspect.shape:", traces_suspect.shape)
-print("traces_third.shape:", traces_third.shape)
 
-points_start = 0
-points_stop = 3200
-print(f"Trimming trace points from [0, {traces_original.shape[-1]}] to [{points_start}, {points_stop}].")
-traces_original = traces_original[:,points_start:points_stop]
-traces_suspect = traces_suspect[:,points_start:points_stop]
-traces_third = traces_third[:,points_start:points_stop]
+#points_start = 0
+#points_stop = 3200
+#print(f"Trimming trace points from [0, {traces_original.shape[-1]}] to [{points_start}, {points_stop}].")
+#traces_original = traces_original[:,points_start:points_stop]
+#traces_suspect = traces_suspect[:,points_start:points_stop]
+
 
 # Multi-scale representation (decimated traces)
 
@@ -165,7 +158,6 @@ print("decimation:", decimation_factor ** n_decimation)
 for i in range(n_decimation):
     traces_original = sig.decimate(traces_original, 2)
     traces_suspect = sig.decimate(traces_suspect, 2)
-    traces_third = sig.decimate(traces_third, 2)
 
 
 #
@@ -177,11 +169,6 @@ print("\nAnalyzing class predictions.")
 diff_original_vs_suspect_idx = np.nonzero(outputs_original != outputs_suspect)[0]
 print("Class predictions that differ for the original and the suspect model:")
 print(f"  {frac_str(len(diff_original_vs_suspect_idx), len(outputs_original))}")
-
-diff_original_vs_third_idx = np.nonzero(outputs_original != outputs_third)[0]
-diff_original_vs_suspect_idx = np.nonzero(outputs_original[diff_original_vs_third_idx] != outputs_suspect[diff_original_vs_third_idx])[0]
-print("For the cases where the original model's and the 3rd-party model's predictions differ, class predictions that differ for the original and the suspect model:")
-print(f"  {frac_str(len(diff_original_vs_suspect_idx), len(diff_original_vs_third_idx))}")
 
 diff_original_vs_correct_idx = np.nonzero(outputs_original != correct_outputs)[0]
 diff_original_vs_suspect_idx = np.nonzero(outputs_original[diff_original_vs_correct_idx] != outputs_suspect[diff_original_vs_correct_idx])[0]
@@ -195,17 +182,6 @@ diff_original_vs_suspect = logits_distance(logits_original, logits_suspect)
 print("Logit distances between the original and suspect model:")
 print_histogram(diff_original_vs_suspect, range=(0, 2))
 
-diff_original_vs_third = logits_distance(logits_original, logits_third)
-#print("Logit distances between the original and 3rd-party model:")
-#print_histogram(diff_original_vs_third, range=(0, 2))
-
-logit_dist_threshold = 1
-diff_original_vs_third_idx = np.nonzero(diff_original_vs_third > logit_dist_threshold)[0]
-
-diff_original_vs_suspect = logits_distance(logits_original[diff_original_vs_third_idx], logits_suspect[diff_original_vs_third_idx])
-print(f"For the cases where logit distance between the original and the 3rd-party model are larger than {logit_dist_threshold}, logit distances between the original and suspect model:")
-print_histogram(diff_original_vs_suspect, range=(0, 2))
-
 diff_original_vs_suspect = logits_distance(logits_original[diff_original_vs_correct_idx], logits_suspect[diff_original_vs_correct_idx])
 print("For the cases where the original model's predictions are not correct, logit distances between the original and suspect model:")
 print_histogram(diff_original_vs_suspect, range=(0, 2))
@@ -213,71 +189,21 @@ print_histogram(diff_original_vs_suspect, range=(0, 2))
 
 print("\nAnalyzing traces.")
 
-print("Calculating overlap between original and 3rd-party models:")
-overlap_original_vs_third = overlap_between_traces(traces_original, traces_third)
-print("Calculating overlap between original and suspect models:")
+print("Calculating overlap between original and suspect model:")
 overlap_original_vs_suspect = overlap_between_traces(traces_original, traces_suspect)
 
-#print("Overlap area original vs 3rd-party:")
-#print_histogram(overlap_original_vs_third, range=(0, 1))
 print("Overlap area original vs suspect:")
 print_histogram(overlap_original_vs_suspect, range=(0, 1))
-
-
-# Find trace points of significance
-overlap_threshold = 0.5 # Distance from mean where two Gaussian distribution cross (in terms of standard deviation)
-overlap_area_threshold = st.norm.cdf(-overlap_threshold) * 2 # in range [0, 1]
-print("overlap_area_threshold:", overlap_area_threshold)
-
-significant_trace_points = np.nonzero(overlap_original_vs_third < overlap_area_threshold)[0]
-print("Significant trace points (points that have small overlap between the original and 3rd-party model):")
-print(f"  {frac_str(len(significant_trace_points), traces_original.shape[-1])}")
-
-
-trace_point_significance = 1 - overlap_original_vs_third
-significance_threshold = 1 - overlap_area_threshold
 
 plt.figure()
-plt.plot(trace_point_significance)
-plt.title("Significance of trace points")
-plt.hlines(significance_threshold, 0, len(trace_point_significance), colors='r')
-
-
-# Find inputs of significance
-diff_original_vs_third = np.sum(np.abs(traces_original - traces_third) * trace_point_significance, axis=1)
-
-top_percentile = 20
-print(f"Taking top {top_percentile}% of the inputs that produced the largest difference in traces.")
-trace_diff_threshold = np.percentile(diff_original_vs_third, 100 - top_percentile)
-
-significant_input_idx = np.nonzero(diff_original_vs_third > trace_diff_threshold)[0]
-
-
-print("\nUsing only significant inputs and trace points.")
-a = traces_original[significant_input_idx][:,significant_trace_points]
-b = traces_suspect[significant_input_idx][:,significant_trace_points]
-
-print("Calculating overlap between original and suspect model:")
-overlap_original_vs_suspect = overlap_between_traces(a, b)
-
-print("Overlap area original vs suspect:")
-print_histogram(overlap_original_vs_suspect, range=(0, 1))
-
-
-print("\nUsing only inputs where the original model produce incorrect predictions.")
-a = traces_original[diff_original_vs_correct_idx]
-b = traces_suspect[diff_original_vs_correct_idx]
-
-print("Calculating overlap between original and suspect model:")
-overlap_original_vs_suspect = overlap_between_traces(a, b)
-
-print("Overlap area original vs suspect:")
-print_histogram(overlap_original_vs_suspect, range=(0, 1))
+plt.plot(overlap_original_vs_suspect)
+plt.title("Overlap of Original and Suspect")
+plt.ylim(0, 1)
 
 
 print("\nUsing only inputs where the original model produce incorrect predictions, together with significant trace points.")
-a = traces_original[diff_original_vs_correct_idx][:,significant_trace_points]
-b = traces_suspect[diff_original_vs_correct_idx][:,significant_trace_points]
+a = traces_original[diff_original_vs_correct_idx]
+b = traces_suspect[diff_original_vs_correct_idx]
 
 print("Calculating overlap between original and suspect model:")
 overlap_original_vs_suspect = overlap_between_traces(a, b)
