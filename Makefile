@@ -117,7 +117,7 @@ verify_inference:
 
 compare_models:
 	$(call print_target_info,$(W)/$(ORIGINAL)_outputs.npy $(W)/$(ORIGINAL)_traces.npy $(W)/$(SUSPECT)_outputs.npy $(W)/$(SUSPECT)_traces.npy $(W)/$(Y_TEST),,ORIGINAL SUSPECT Y_TEST)
-	$(call command,ipython sca/compare-models.py $(W)/$(ORIGINAL) $(W)/$(SUSPECT) $(W)/$(Y_TEST))
+	$(call command,ipython sca/compare_models.py $(W)/$(ORIGINAL) $(W)/$(SUSPECT) $(W)/$(Y_TEST))
 
 
 detect_stolen:
