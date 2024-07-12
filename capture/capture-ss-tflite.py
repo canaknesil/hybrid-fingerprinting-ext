@@ -208,13 +208,13 @@ assert test_data.dtype == input_type_np
 n_warmup_traces = 10
 print(f"Capturing {n_warmup_traces} warming-up traces.")
 
-warmup_traces = np.zeros([n_warmup_traces, n_samples], dtype=np.float64)
+warmup_traces = np.zeros([n_warmup_traces, n_samples], dtype=np.float32)
 for i in range(n_warmup_traces):
     input_data = np.full(input_shape, 0.5, dtype=input_type_np)
     #input_data = np.random.rand(*input_shape).astype(input_type_np)
 
     output_data, trace = infer_and_capture_trace(input_data)
-    warmup_traces[i] = trace
+    warmup_traces[i] = trace.astype(np.float32)
 
 #plt.figure()
 #plt.plot(np.average(warmup_traces, axis=0))
@@ -224,9 +224,9 @@ for i in range(n_warmup_traces):
 
 inputs = np.zeros([num_traces] + input_shape, dtype=input_type_np)
 outputs = np.zeros([num_traces] + output_shape, dtype=output_type_np)
-traces = np.zeros([num_traces, n_samples], dtype=np.float64)
+traces = np.zeros([num_traces, n_samples], dtype=np.float32)
 
-traces_to_avg = np.zeros([avg_factor, n_samples], dtype=np.float64)
+traces_to_avg = np.zeros([avg_factor, n_samples], dtype=np.float32)
 outputs_before_avg = np.zeros([avg_factor] + output_shape, dtype=output_type_np)
 
 print("Capturing traces.")
@@ -238,12 +238,12 @@ for i in tqdm(range(num_traces)):
 
     if avg_factor == 1:
         output_data, trace = infer_and_capture_trace(input_data)
-        traces[i] = trace
+        traces[i] = trace.astype(np.float32)
         outputs[i] = output_data
     else:
         for j in range(avg_factor):
             output_data, trace = infer_and_capture_trace(input_data)
-            traces_to_avg[j] = trace
+            traces_to_avg[j] = trace.astype(np.float32)
             outputs_before_avg[j] = output_data
 
         if not all(e == outputs_before_avg[0] for e in outputs_before_avg[1:]):

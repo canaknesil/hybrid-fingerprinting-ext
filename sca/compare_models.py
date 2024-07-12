@@ -2,6 +2,7 @@ import sys
 import numpy as np
 import scipy.stats as st
 import scipy.signal as sig
+from scipy.integrate import quad
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
@@ -75,8 +76,63 @@ def pdf(samples, x=None):
     return x, kde(x)
 
 
-def pdf_overlap_area(pdf_a, pdf_b, dx=1):
+def pdf_overlap_area(samples_a, samples_b):
+    min_x = min(list(map(np.min, [samples_a, samples_b])))
+    max_x = max(list(map(np.max, [samples_a, samples_b])))
+    x = np.linspace(min_x, max_x, 40)
+    dx = x[1] - x[0]
+    _, pdf_a = pdf(samples_a, x)
+    _, pdf_b = pdf(samples_b, x)
     return np.sum(np.minimum(pdf_a, pdf_b)) * dx
+
+
+def pdf_overlap_area_quad(samples_a, samples_b):
+    kde_a = st.gaussian_kde(samples_a)
+    kde_b = st.gaussian_kde(samples_b)
+    
+    def min_pdf(x):
+        return np.minimum(kde_a(x), kde_b(x))
+
+    min_x = min(np.min(samples_a), np.min(samples_b))
+    max_x = max(np.max(samples_a), np.max(samples_b))
+
+    overlap_area, _ = quad(min_pdf, min_x, max_x)
+    return overlap_area
+
+
+def pdf_overlap_area_hist(samples_a, samples_b):
+    min_s = min(np.min(samples_a), np.min(samples_b))
+    max_s = max(np.max(samples_a), np.max(samples_b))
+
+    n_bins = 30 # This number influences the absolute result significantly.
+    bins = np.linspace(min_s, max_s, n_bins)
+    hist_a, _ = np.histogram(samples_a, bins=bins, density=True)
+    hist_b, _ = np.histogram(samples_b, bins=bins, density=True)
+    
+    # Calculate overlap area
+    bin_width = bins[1] - bins[0]
+    overlap_area = np.sum(np.minimum(hist_a, hist_b)) * bin_width
+    return overlap_area
+
+
+def pdf_overlap_area_gaussian(samples_a, samples_b):
+    # Assuming gaussian distributions for the input samples.
+    mean_a = np.average(samples_a)
+    mean_b = np.average(samples_b)
+    std_a = np.std(samples_a)
+    std_b = np.std(samples_b)
+
+    # Bhattacharyya distance
+    part1 = 0.25 * (mean_a - mean_b) ** 2 / (std_a ** 2 + std_b ** 2)
+    part2 = 0.5 * np.log(0.5 * (std_a ** 2 + std_b ** 2) / (std_a * std_b))
+    BD = part1 + part2
+
+    # Bhattacharyya coefficient
+    BC = np.exp(-BD)
+    overlap_area = BC    
+    
+    return overlap_area
+    
 
 
 def overlap_between_traces(traces_a, traces_b):
@@ -84,13 +140,22 @@ def overlap_between_traces(traces_a, traces_b):
     for i in tqdm(range(traces_a.shape[-1])):
         a = traces_a[:,i]
         b = traces_b[:,i]
-        min_x = min(list(map(np.min, [a, b])))
-        max_x = max(list(map(np.max, [a, b])))
-        x = np.linspace(min_x, max_x, 50)
-        dx = x[1] - x[0]
-        _, pdf_a = pdf(a, x)
-        _, pdf_b = pdf(b, x)
-        overlap[i] = pdf_overlap_area(pdf_a, pdf_b, dx=dx)
+
+        # Method with KDE (slow)
+        overlap[i] = pdf_overlap_area(a, b)
+
+        # Method with numerical integration (very slow)
+        #overlap[i] = pdf_overlap_area_quad(a, b)
+
+        # Method with histogram (very fast, but not accurate, parametric)
+        #overlap[i] = pdf_overlap_area_hist(a, b)
+
+        # Method with Bhattacharyya coefficient (very fast, assuming
+        # gaussian dists) This method returns very high overlap every
+        # almost every time. Maybe distributions are not close to
+        # Gaussian.
+        #overlap[i] = pdf_overlap_area_gaussian(a, b)
+        
     return overlap
 
 
@@ -204,7 +269,7 @@ def compare_models(original_prefix, suspect_prefix, correct_outputs_file, decima
     plt.figure()
     plt.plot(overlap_original_vs_suspect)
     plt.title("Overlap of Original and Suspect")
-    plt.ylim(0, 1)
+    #plt.ylim(0, 1)
     
     print("T-test between original and suspect model:")
     ttest_original_vs_suspect = ttest(traces_original, traces_suspect)
