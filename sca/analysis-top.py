@@ -65,6 +65,9 @@ pairs_third = list(zip([models[0]] * (n-2), models[2:]))
 print_models("Original vs. 3rd-party pairs", pairs_third)
 
 
+# TODO: Collect traces for copy model add it here.
+
+
 #
 # METRICS TO EVALUATE
 #
@@ -84,18 +87,15 @@ metric_types = ["class_prediction", "logit", "trace_overlap"]
 # The method used to calculate overlap between probability
 # distributions between traces from the original and the suspect
 # model. Trying only kde and histogram. Numerical integral method
-# "integral" is very slow, "gaussian" is wrong.
-#overlap_methods = ["kde", "histogram"]
-overlap_methods = ["histogram"]
+# "integral" is very slow, "gaussian" is wrong. The variable
+# overlap_methods is not currently in use. It may be incorporated into
+# the metric_types variable.
+overlap_methods = ["kde", "histogram"]
 
 # The filtering that will be applied to the above
 # information. "when_orig_wrong" compares only the cases where the
 # original model's predictions are wrong.
 output_filters = ["none", "when_orig_wrong"]
-
-
-# TODO: Incorporate overlap_methods into metric_types as e.g. "trace_overlap_kde"
-# TODO: Incorporate decimation
 
 
 #
@@ -175,10 +175,18 @@ for extraction_method in extraction_methods:
                 results[query_type][extraction_method]["trace_overlap"]["when_orig_wrong"].append(res["trace_overlap_when_orig_wrong"])
 
 
+print("\nResults:")
+print(results)
+                
+results_file = workspace + "/analysis-results"
+print("Writing results to " + results_file)
 
+with open(results_file, "w") as f:
+    print(results, file=f)
+    
             
 #
-# ANALYIS OF RESULTS
+# INTERPRETATION OF RESULTS
 #
 
 def result_to_str(r):
@@ -215,10 +223,3 @@ for a in query_types:
             print("Original vs. Retrained:", result_to_str(orig_vs_retrained))
             print("Original vs. 3rd-party:", result_to_str(orig_vs_third))
                   
-        
-
-
-# TODO: For copy model, split the traces in 2 and compare to each other.
-
-
-
