@@ -206,9 +206,8 @@ def read_model_outputs(outputs_original, outputs_suspect, correct_outputs=None, 
 #
 
 def compare_model_outputs(outputs_original, outputs_suspect, correct_outputs=None, verbose=False):
-    # PROCESS COMMAND LINE INPUTS
+    # PROCESS INPUT
 
-    # Model predictions (outputs)
     outputs_original, outputs_suspect, correct_outputs = read_model_outputs(outputs_original, outputs_suspect, correct_outputs, verbose=verbose)
     
     logits_original = outputs_original
