@@ -7,6 +7,8 @@ import sys
 import numpy as np
 from tqdm import tqdm
 import scipy.stats as st
+import math
+import copy
 
 
 #
@@ -28,6 +30,15 @@ def ls_re(pattern):
 
 
 models = ls_re("^mnist_7x7_indep-\d+_init-\d+$")
+
+# There is actually no model whose name ends with "_copy" because they
+# would be the same as their equivalent, without the "_copy"
+# postfix. However, a second set of traces are collected for these
+# models. The name of the trace files end with "_copy_traces.npy".
+# models_copy = list(map(lambda s: s + "_copy", models))
+models_copy1 = list(map(lambda s: s + "_copy1", models))
+models_copy2 = list(map(lambda s: s + "_copy2", models))
+
 models_snr_1000 = ls_re("^mnist_7x7_indep-\d+_init-\d+_snr-1000$")
 models_snr_100 = ls_re("^mnist_7x7_indep-\d+_init-\d+_snr-100$")
 models_snr_10 = ls_re("^mnist_7x7_indep-\d+_init-\d+_snr-10$")
@@ -42,6 +53,9 @@ def print_models(info, models):
 
 
 print_models("models", models)
+#print_models("models_copy", models_copy)
+print_models("models_copy1", models_copy1)
+print_models("models_copy2", models_copy2)
 print_models("models_snr_1000", models_snr_1000)
 print_models("models_snr_100", models_snr_100)
 print_models("models_snr_10", models_snr_10)
@@ -53,9 +67,12 @@ print("Correct outputs:", correct_outputs)
 correct_outputs = np.load(correct_outputs)
 
 print()
+#pairs_copy = list(zip(models, models_copy))
+pairs_copy = list(zip(models_copy1, models_copy2))
 pairs_snr_1000 = list(zip(models, models_snr_1000))
 pairs_snr_100 = list(zip(models, models_snr_100))
 pairs_snr_10 = list(zip(models, models_snr_10))
+print_models("Original vs. Copy pairs", pairs_copy)
 print_models("Original vs. Noisy (SNR=1000) pairs", pairs_snr_1000)
 print_models("Original vs. Noisy (SNR=100) pairs", pairs_snr_100)
 print_models("Original vs. Noisy (SNR=10) pairs", pairs_snr_10)
@@ -76,8 +93,6 @@ print_models("Original vs. 3rd-party pairs", pairs_third)
 
 #sys.exit()
 
-# TODO: Collect traces for copy model add it here.
-
 
 #
 # METRICS TO EVALUATE
@@ -90,8 +105,7 @@ print_models("Original vs. 3rd-party pairs", pairs_third)
 #query_types = ["regular", "random"]
 query_types = ["regular"]
 
-# TODO: add "copy" type
-extraction_methods = ["snr-1000", "snr-100", "snr-10", "retrained", "third"]
+extraction_methods = ["copy", "snr-1000", "snr-100", "snr-10", "retrained", "third"]
 
 # Information whose similarity between the original and the suspect model will be analyzed.
 metric_types = ["class_prediction", "logit", "trace_overlap"]
@@ -135,19 +149,19 @@ def load_data(prefix):
         data = load_data_from_disk(prefix)
         load_cache[prefix] = data
         return data
-    
 
+    
 def load_data_from_disk(prefix):
     outputs = np.load(prefix + "_outputs.npy")
-    traces = np.load(prefix + "_traces.npy")
+    traces = np.load(prefix + "_traces.npy") # Using mmap_mode isn't faster.
 
-    traces = decimate_traces(traces, 2, 3)
+    traces = decimate_traces(traces, 2, 2) # (factor=2, n_decimation=2) is found to be a good compromise.
     
     return outputs, traces
 
 
 results = init_results([query_types, extraction_methods, metric_types, output_filters])
-model_pairs_dict = dict(zip(extraction_methods, [pairs_snr_1000, pairs_snr_100, pairs_snr_10, pairs_retrained, pairs_third]))
+model_pairs_dict = dict(zip(extraction_methods, [pairs_copy, pairs_snr_1000, pairs_snr_100, pairs_snr_10, pairs_retrained, pairs_third]))
 
 for extraction_method in extraction_methods:
     
@@ -157,27 +171,21 @@ for extraction_method in extraction_methods:
     
         model_pairs = model_pairs_dict[extraction_method]
 
-        # Load outputs and traces
-        print("Loading data.")
-        models = []
-        for p in model_pairs:
-            models += p
-        models = set(models)
-
-        data = {}
-        for m in models:
-            prefix = workspace + "/" + m
-            if query_type == "random":
-                prefix += "_rand-x"
-            print(f"  {prefix}")
-            data[m] = load_data(prefix)
-
         print("Comparing models:")
         for m1, m2 in model_pairs:
             print(f"  ({m1}, {m2})")
-            m1_outputs, m1_traces = data[m1]
-            m2_outputs, m2_traces = data[m2]
 
+
+            # Load outputs and traces
+            prefix1 = workspace + "/" + m1
+            prefix2 = workspace + "/" + m2
+            if query_type == "random":
+                prefix1 += "_rand-x"
+                prefix2 += "_rand-x"
+
+            m1_outputs, m1_traces = load_data(prefix1)
+            m2_outputs, m2_traces = load_data(prefix2)
+            
             if query_type == "random":
                 m1 += "_rand-x"
                 corr_outputs = None
@@ -215,13 +223,50 @@ with open(results_file, "w") as f:
 # INTERPRETATION OF RESULTS
 #
 
+def pdf_overlap_area_gaussian(mean_a, std_a, mean_b, std_b):
+    # Bhattacharyya distance
+    part1 = 0.25 * (mean_a - mean_b) ** 2 / (std_a ** 2 + std_b ** 2)
+    part2 = 0.5 * np.log(0.5 * (std_a ** 2 + std_b ** 2) / (std_a * std_b))
+    BD = part1 + part2
+
+    # Bhattacharyya coefficient
+    BC = np.exp(-BD)
+    overlap_area = BC    
+    
+    return overlap_area
+
 def confusion_metrics(samples_a, samples_b):
+    # st.gaussian_kde doesn't work when all samples are
+    # equal. Defining kde_a as a normal distribution with std
+    # 1/sqrt(N) didn't work. Adding a small noise to the samples
+    # didn't work either.
+    is_identical_a = all([s == samples_a[0] for s in samples_a])
+    is_identical_b = all([s == samples_b[0] for s in samples_b])
+
+    if is_identical_a and is_identical_b:
+        # Assuming number of samples are the same for a and b.
+        mean_a = samples_a[0]
+        mean_b = samples_b[0]
+        std_a = 1 / math.sqrt(len(samples_a))
+        std_b = 1 / math.sqrt(len(samples_b))
+        overlap_area = pdf_overlap_area_gaussian(mean_a, std_a, mean_b, std_b)
+        tpr = tnr = 1 - overlap_area / 2
+        fpr = fnr = overlap_area / 2
+        return tpr, tnr, fpr, fnr
+
+    if is_identical_a or is_identical_b:
+        # Assuming large number of samples so the distribution of a is
+        # very thin and tall.
+        tpr = tnr = 1
+        fpr = fnr = 0
+        return tpr, tnr, fpr, fnr
+
     kde_a = st.gaussian_kde(samples_a)
     kde_b = st.gaussian_kde(samples_b)
 
     min_x = min(list(map(np.min, [samples_a, samples_b])))
     max_x = max(list(map(np.max, [samples_a, samples_b])))
-    x = np.linspace(min_x, max_x, 100000)
+    x = np.linspace(min_x, max_x, 1000000)
     dx = x[1] - x[0]
 
     pdf_a = kde_a(x)
@@ -236,6 +281,10 @@ def confusion_metrics(samples_a, samples_b):
 
 
 def confusion_metrics_multi(samples_a, *samples_b):
+    # Assuming samples in a are not equal.
+    # Ignoring sets where samples are equal in b.
+    samples_b = list(filter(lambda ss: not all([s == ss[0] for s in ss]), samples_b))
+    
     kde_a = st.gaussian_kde(samples_a)
     kde_b = list(map(st.gaussian_kde, samples_b))
 
@@ -250,7 +299,18 @@ def confusion_metrics_multi(samples_a, *samples_b):
     tpr = np.sum(pdf_a[np.all([pdf_a > p for p in pdf_b], axis=0)]) * dx
     fnr = 1 - tpr
 
-    return tpr, fnr
+    return tpr, np.nan, np.nan, fnr
+
+
+def confusion_metrics_majority_voting(cm1, cm2):
+    tpr1, tnr1, fpr1, fnr1 = cm1
+    tpr2, tnr2, fpr2, fnr2 = cm2
+
+    tpr = tpr1 * tpr2
+    tnr = tnr1 * tnr2
+    fpr = fpr1 * fpr2
+    fnr = fnr1 * fnr2
+    return tpr, tnr, fpr, fnr
 
 
 def result_to_str(r):
@@ -270,7 +330,7 @@ def result_to_str(r):
         std = np.std(r)
         size = len(r)
         
-    return f"{mean:.5f} +- {std:.5f} (out of {size})"
+    return f"{mean:.4f} +- {std:.4f} (out of {size})"
 
 
 def tuple_to_str(r):
@@ -278,28 +338,84 @@ def tuple_to_str(r):
         return "()"
     
     s = "("
-    s += f"{r[0]:.5f}"
+    s += f"{r[0]:.4f}"
     for x in r[1:]:
-        s += f" {x:.5f}"
+        s += f" {x:.4f}"
     s += ")"
     return s
 
+
+simple_results = copy.deepcopy(results)
 
 for a in query_types:
     for c in metric_types:
         for d in output_filters:
             print()
             print(f"query_type: {a}, metric_type: {c}, output_filter: {d}")
+            orig_vs_copy = results[a]["copy"][c][d]
             orig_vs_snr_1000 = results[a]["snr-1000"][c][d]
             orig_vs_snr_100 = results[a]["snr-100"][c][d]
             orig_vs_snr_10 = results[a]["snr-10"][c][d]
             orig_vs_retrained = results[a]["retrained"][c][d]
             orig_vs_third = results[a]["third"][c][d]
 
-            print(f"Original vs. Noisy (SNR=1000): {result_to_str(orig_vs_snr_1000) } (tpr, tnr, fpr, fnr)={tuple_to_str(confusion_metrics(orig_vs_snr_1000, orig_vs_third))}")
-            print(f"Original vs. Noisy (SNR=100) : {result_to_str(orig_vs_snr_100)  } (tpr, tnr, fpr, fnr)={tuple_to_str(confusion_metrics(orig_vs_snr_100, orig_vs_third))}")
-            print(f"Original vs. Noisy (SNR=10)  : {result_to_str(orig_vs_snr_10)   } (tpr, tnr, fpr, fnr)={tuple_to_str(confusion_metrics(orig_vs_snr_10, orig_vs_third))}")
-            print(f"Original vs. Retrained       : {result_to_str(orig_vs_retrained)} (tpr, tnr, fpr, fnr)={tuple_to_str(confusion_metrics(orig_vs_retrained, orig_vs_third))}")
-            print(f"Original vs. 3rd-party       : {result_to_str(orig_vs_third)    } (tpr, fnr)={tuple_to_str(confusion_metrics_multi(orig_vs_third, orig_vs_snr_1000, orig_vs_snr_100, orig_vs_snr_10, orig_vs_retrained))}")
+            orig_vs_copy_cm = confusion_metrics(orig_vs_copy, orig_vs_third)
+            orig_vs_snr_1000_cm = confusion_metrics(orig_vs_snr_1000, orig_vs_third)
+            orig_vs_snr_100_cm = confusion_metrics(orig_vs_snr_100, orig_vs_third)
+            orig_vs_snr_10_cm = confusion_metrics(orig_vs_snr_10, orig_vs_third)
+            orig_vs_retrained_cm = confusion_metrics(orig_vs_retrained, orig_vs_third)
+            orig_vs_third_cm = confusion_metrics_multi(orig_vs_third, orig_vs_copy, orig_vs_snr_1000, orig_vs_snr_100, orig_vs_snr_10, orig_vs_retrained)
 
-                  
+            print(f"Original vs. Copy            : {result_to_str(orig_vs_copy)     } (tpr, tnr, fpr, fnr)={tuple_to_str(orig_vs_copy_cm)}")
+            print(f"Original vs. Noisy (SNR=1000): {result_to_str(orig_vs_snr_1000) } (tpr, tnr, fpr, fnr)={tuple_to_str(orig_vs_snr_1000_cm)}")
+            print(f"Original vs. Noisy (SNR=100) : {result_to_str(orig_vs_snr_100)  } (tpr, tnr, fpr, fnr)={tuple_to_str(orig_vs_snr_100_cm)}")
+            print(f"Original vs. Noisy (SNR=10)  : {result_to_str(orig_vs_snr_10)   } (tpr, tnr, fpr, fnr)={tuple_to_str(orig_vs_snr_10_cm)}")
+            print(f"Original vs. Retrained       : {result_to_str(orig_vs_retrained)} (tpr, tnr, fpr, fnr)={tuple_to_str(orig_vs_retrained_cm)}")
+            print(f"Original vs. 3rd-party       : {result_to_str(orig_vs_third)    } (tpr, tnr, fpr, fnr)={tuple_to_str(orig_vs_third_cm)}")
+            
+            simple_results[a]["copy"][c][d] = orig_vs_copy_cm
+            simple_results[a]["snr-1000"][c][d] = orig_vs_snr_1000_cm
+            simple_results[a]["snr-100"][c][d] = orig_vs_snr_100_cm
+            simple_results[a]["snr-10"][c][d] = orig_vs_snr_10_cm
+            simple_results[a]["retrained"][c][d] = orig_vs_retrained_cm
+            simple_results[a]["third"][c][d] = orig_vs_third_cm
+
+
+for a in query_types:
+    for d in output_filters:
+        for e in extraction_methods:
+            print()
+            print(f"query_type: {a}, output_filter: {d}, extraction_method: {e}")
+
+            class_prediction_cm = simple_results[a][e]["class_prediction"][d]
+            logit_cm = simple_results[a][e]["logit"][d]
+            trace_overlap_cm = simple_results[a][e]["trace_overlap"][d]
+
+            hybrid1_cm = confusion_metrics_majority_voting(class_prediction_cm, trace_overlap_cm)
+            hybrid2_cm = confusion_metrics_majority_voting(logit_cm, trace_overlap_cm)
+
+            # TODO: Find a new way to represent hybrid results.
+
+            improvement1 = []
+            improvement2 = []
+
+            for i in range(len(class_prediction_cm)):
+                x = class_prediction_cm[i]
+                y = hybrid1_cm[i]
+                z = (y - x) / x
+                improvement1.append(z)
+
+            for i in range(len(class_prediction_cm)):
+                x = logit_cm[i]
+                y = hybrid2_cm[i]
+                z = (y - x) / x
+                improvement2.append(z)
+
+            print(f"class_prediction                       : (tpr, tnr, fpr, fnr)={tuple_to_str(class_prediction_cm)}")
+            print(f"Hybrid class_prediction + trace_overlap: (tpr, tnr, fpr, fnr)={tuple_to_str(hybrid1_cm)}")
+            print(f"                                                  improvement={tuple_to_str(improvement1)}")
+            print(f"logit                                  : (tpr, tnr, fpr, fnr)={tuple_to_str(logit_cm)}")
+            print(f"Hybrid logit            + trace_overlap: (tpr, tnr, fpr, fnr)={tuple_to_str(hybrid2_cm)}")
+            print(f"                                                  improvement={tuple_to_str(improvement2)}")
+
+            

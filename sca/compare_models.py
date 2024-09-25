@@ -249,7 +249,7 @@ def compare_model_outputs(outputs_original, outputs_suspect, correct_outputs=Non
         print("\nAnalyzing logits.")
     
     diff_original_vs_suspect = logits_distance(logits_original, logits_suspect)
-    results["logits"] = 2 - np.average(diff_original_vs_suspect)
+    results["logits"] = (2 - np.average(diff_original_vs_suspect)) / 2 # dividing by 2 so that its range is [0, 1]
 
     if verbose:
         print("Logit distances between the original and suspect model:")
@@ -257,7 +257,7 @@ def compare_model_outputs(outputs_original, outputs_suspect, correct_outputs=Non
 
     if correct_outputs is not None:
         diff_original_vs_suspect = logits_distance(logits_original[diff_original_vs_correct_idx], logits_suspect[diff_original_vs_correct_idx])
-        results["logits_when_orig_wrong"] = 2 - np.average(diff_original_vs_suspect)
+        results["logits_when_orig_wrong"] = (2 - np.average(diff_original_vs_suspect)) / 2
 
         if verbose:
             print("For the cases where the original model's predictions are not correct, logit distances between the original and suspect model:")
