@@ -175,7 +175,6 @@ for extraction_method in extraction_methods:
         for m1, m2 in model_pairs:
             print(f"  ({m1}, {m2})")
 
-
             # Load outputs and traces
             prefix1 = workspace + "/" + m1
             prefix2 = workspace + "/" + m2
@@ -313,6 +312,36 @@ def confusion_metrics_majority_voting(cm1, cm2):
     return tpr, tnr, fpr, fnr
 
 
+def confusion_metrics_and(cm1, cm2):
+    tpr1, tnr1, fpr1, fnr1 = cm1
+    tpr2, tnr2, fpr2, fnr2 = cm2
+
+    tpr = tpr1 * tpr2
+    tnr = tnr1 * tnr2
+    fpr = fpr1 * fpr2
+    fnr = 1 - tpr
+    return tpr, tnr, fpr, fnr
+
+
+def confusion_metrics_or(cm1, cm2):
+    tpr1, tnr1, fpr1, fnr1 = cm1
+    tpr2, tnr2, fpr2, fnr2 = cm2
+
+    tpr = 1 - (1 - tpr1) * (1 - tpr2)
+    tnr = tnr1 * tnr2
+    fpr = 1 - (1 - fpr1) * (1 - fpr2)
+    fnr = fnr1 * fnr2
+    return tpr, tnr, fpr, fnr
+
+
+def cm_to_accuracy(tpr, tnr, fpr, fnr):
+    return (tpr + tnr) / 2
+
+
+def cm_to_f1_score(tpr, tnr, fpr, fnr):
+    return 2 * tpr / (tpr + fpr)
+
+
 def result_to_str(r):
     r = np.array(r)
     assert(len(r.shape) == 1)
@@ -343,6 +372,9 @@ def tuple_to_str(r):
         s += f" {x:.4f}"
     s += ")"
     return s
+
+
+# TODO: Joint metric (that uses joint probability distribution).
 
 
 simple_results = copy.deepcopy(results)
@@ -384,38 +416,40 @@ for a in query_types:
 for a in query_types:
     for d in output_filters:
         for e in extraction_methods:
-            print()
-            print(f"query_type: {a}, output_filter: {d}, extraction_method: {e}")
-
             class_prediction_cm = simple_results[a][e]["class_prediction"][d]
             logit_cm = simple_results[a][e]["logit"][d]
             trace_overlap_cm = simple_results[a][e]["trace_overlap"][d]
 
-            hybrid1_cm = confusion_metrics_majority_voting(class_prediction_cm, trace_overlap_cm)
-            hybrid2_cm = confusion_metrics_majority_voting(logit_cm, trace_overlap_cm)
+            accuracy_class_prediction = cm_to_accuracy(*class_prediction_cm)
+            accuracy_logit = cm_to_accuracy(*logit_cm)
 
-            # TODO: Find a new way to represent hybrid results.
+            f1_class_prediction = cm_to_f1_score(*class_prediction_cm)
+            f1_logit = cm_to_f1_score(*logit_cm)
+            
+            hybrid_methods = {"AND": confusion_metrics_and,
+                              "OR" : confusion_metrics_or}
+            
+            for m, merge_cm in hybrid_methods.items():
+                print()
+                print(f"query_type: {a}, output_filter: {d}, extraction_method: {e}, hybrid method: {m}")
 
-            improvement1 = []
-            improvement2 = []
+                hybrid1_cm = merge_cm(class_prediction_cm, trace_overlap_cm)
+                hybrid2_cm = merge_cm(logit_cm, trace_overlap_cm)
+                
+                accuracy_hybrid1 = cm_to_accuracy(*hybrid1_cm)
+                accuracy_hybrid2 = cm_to_accuracy(*hybrid2_cm)
 
-            for i in range(len(class_prediction_cm)):
-                x = class_prediction_cm[i]
-                y = hybrid1_cm[i]
-                z = (y - x) / x
-                improvement1.append(z)
-
-            for i in range(len(class_prediction_cm)):
-                x = logit_cm[i]
-                y = hybrid2_cm[i]
-                z = (y - x) / x
-                improvement2.append(z)
-
-            print(f"class_prediction                       : (tpr, tnr, fpr, fnr)={tuple_to_str(class_prediction_cm)}")
-            print(f"Hybrid class_prediction + trace_overlap: (tpr, tnr, fpr, fnr)={tuple_to_str(hybrid1_cm)}")
-            print(f"                                                  improvement={tuple_to_str(improvement1)}")
-            print(f"logit                                  : (tpr, tnr, fpr, fnr)={tuple_to_str(logit_cm)}")
-            print(f"Hybrid logit            + trace_overlap: (tpr, tnr, fpr, fnr)={tuple_to_str(hybrid2_cm)}")
-            print(f"                                                  improvement={tuple_to_str(improvement2)}")
+                f1_hybrid1 = cm_to_f1_score(*hybrid1_cm)
+                f1_hybrid2 = cm_to_f1_score(*hybrid2_cm)            
+                
+                improvement1 = (f1_hybrid1 - f1_class_prediction) / f1_class_prediction
+                improvement2 = (f1_hybrid2 - f1_logit) / f1_logit
+                
+                print(f"class_prediction                       : accuracy={f1_class_prediction:.4f}")
+                print(f"Hybrid class_prediction + trace_overlap: accuracy={f1_hybrid1:.4f}")
+                print(f"                                      improvement={improvement1:.4f}")
+                print(f"logit                                  : accuracy={f1_logit:.4f}")
+                print(f"Hybrid logit            + trace_overlap: accuracy={f1_hybrid2:.4f}")
+                print(f"                                      improvement={improvement2:.4f}")
 
             
