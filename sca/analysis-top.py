@@ -9,6 +9,7 @@ from tqdm import tqdm
 import scipy.stats as st
 import math
 import copy
+from functools import reduce
 
 
 #
@@ -90,6 +91,17 @@ n = len(models)
 pairs_third = list(zip([models[0]] * (n-2), models[2:]))
 print_models("Original vs. 3rd-party pairs", pairs_third)
 
+
+debug = False
+if debug:
+    n = 3
+    pairs_copy = pairs_copy[:n]
+    pairs_snr_1000 = pairs_snr_1000[:n]
+    pairs_snr_100 = pairs_snr_100[:n]
+    pairs_snr_10 = pairs_snr_10[:n]
+    pairs_retrained = pairs_retrained[:n]
+    pairs_third = pairs_third[:n]
+    
 
 #sys.exit()
 
@@ -217,7 +229,7 @@ print("Writing results to " + results_file)
 with open(results_file, "w") as f:
     print(results, file=f)
     
-            
+
 #
 # INTERPRETATION OF RESULTS
 #
@@ -244,28 +256,34 @@ def confusion_metrics(samples_a, samples_b):
 
     if is_identical_a and is_identical_b:
         # Assuming number of samples are the same for a and b.
-        mean_a = samples_a[0]
-        mean_b = samples_b[0]
-        std_a = 1 / math.sqrt(len(samples_a))
-        std_b = 1 / math.sqrt(len(samples_b))
-        overlap_area = pdf_overlap_area_gaussian(mean_a, std_a, mean_b, std_b)
-        tpr = tnr = 1 - overlap_area / 2
-        fpr = fnr = overlap_area / 2
-        return tpr, tnr, fpr, fnr
+        # mean_a = samples_a[0]
+        # mean_b = samples_b[0]
+        # std_a = 1 / math.sqrt(len(samples_a))
+        # std_b = 1 / math.sqrt(len(samples_b))
+        # overlap_area = pdf_overlap_area_gaussian(mean_a, std_a, mean_b, std_b)
+        # tpr = tnr = 1 - overlap_area / 2
+        # fpr = fnr = overlap_area / 2
+        # return tpr, tnr, fpr, fnr
+        return np.nan, np.nan, np.nan, np.nan
 
     if is_identical_a or is_identical_b:
         # Assuming large number of samples so the distribution of a is
         # very thin and tall.
-        tpr = tnr = 1
-        fpr = fnr = 0
-        return tpr, tnr, fpr, fnr
+        # tpr = tnr = 1
+        # fpr = fnr = 0
+        # return tpr, tnr, fpr, fnr
+        return np.nan, np.nan, np.nan, np.nan
 
     kde_a = st.gaussian_kde(samples_a)
     kde_b = st.gaussian_kde(samples_b)
 
     min_x = min(list(map(np.min, [samples_a, samples_b])))
     max_x = max(list(map(np.max, [samples_a, samples_b])))
-    x = np.linspace(min_x, max_x, 1000000)
+    extra = (max_x - min_x) / 4
+    min_x -= extra
+    max_x += extra
+    
+    x = np.linspace(min_x, max_x, 10000000)
     dx = x[1] - x[0]
 
     pdf_a = kde_a(x)
@@ -273,8 +291,50 @@ def confusion_metrics(samples_a, samples_b):
 
     tpr = np.sum(pdf_a[pdf_a > pdf_b]) * dx
     tnr = np.sum(pdf_b[pdf_b > pdf_a]) * dx
-    fpr = 1 - tnr
-    fnr = 1 - tpr
+    fpr = np.sum(pdf_b[pdf_a > pdf_b]) * dx
+    fnr = np.sum(pdf_a[pdf_b > pdf_a]) * dx
+
+    return tpr, tnr, fpr, fnr
+
+
+def confusion_metrics_joint(samples_a, samples_b):
+    samples_a = np.array(samples_a)
+    samples_b = np.array(samples_b)
+    assert len(samples_a.shape) == len(samples_b.shape) == 2 # (dims, data)
+
+    try:
+        kde_a = st.gaussian_kde(samples_a)
+        kde_b = st.gaussian_kde(samples_b)
+    except np.linalg.LinAlgError:
+        # Probably samples in one or more sample sets are equal.
+        return np.nan, np.nan, np.nan, np.nan
+
+    mins_a = np.min(samples_a, axis=1)
+    mins_b = np.min(samples_b, axis=1)
+    mins = np.minimum(mins_a, mins_b)
+    maxs_a = np.max(samples_a, axis=1)
+    maxs_b = np.max(samples_b, axis=1)
+    maxs = np.maximum(maxs_a, maxs_b)
+
+    # Expand min and max so that ot covers pdf's tails.
+    extra = (maxs - mins) / 4
+    mins -= extra
+    maxs += extra
+
+    x = []
+    for minval, maxval in zip(mins, maxs):
+        x.append(np.linspace(minval, maxval, 1000))
+    dx = reduce(lambda a, b: a*b, map(lambda a: a[1] - a[0], x))
+
+    x = list(map(lambda a: a.flatten(), np.meshgrid(*x)))
+
+    pdf_a = kde_a(x)
+    pdf_b = kde_b(x)
+
+    tpr = np.sum(pdf_a[pdf_a > pdf_b]) * dx
+    tnr = np.sum(pdf_b[pdf_b > pdf_a]) * dx
+    fpr = np.sum(pdf_b[pdf_a > pdf_b]) * dx
+    fnr = np.sum(pdf_a[pdf_b > pdf_a]) * dx
 
     return tpr, tnr, fpr, fnr
 
@@ -342,7 +402,7 @@ def cm_to_f1_score(tpr, tnr, fpr, fnr):
     return 2 * tpr / (tpr + fpr)
 
 
-def result_to_str(r):
+def stats_to_str(r):
     r = np.array(r)
     assert(len(r.shape) == 1)
     
@@ -374,82 +434,54 @@ def tuple_to_str(r):
     return s
 
 
-# TODO: Joint metric (that uses joint probability distribution).
+def cm_improvement(cm1, cm2):
+    x = np.array(cm1)
+    y = np.array(cm2)
+    return (y - x)
 
-
-simple_results = copy.deepcopy(results)
 
 for a in query_types:
     for c in metric_types:
         for d in output_filters:
             print()
             print(f"query_type: {a}, metric_type: {c}, output_filter: {d}")
-            orig_vs_copy = results[a]["copy"][c][d]
-            orig_vs_snr_1000 = results[a]["snr-1000"][c][d]
-            orig_vs_snr_100 = results[a]["snr-100"][c][d]
-            orig_vs_snr_10 = results[a]["snr-10"][c][d]
-            orig_vs_retrained = results[a]["retrained"][c][d]
+                
             orig_vs_third = results[a]["third"][c][d]
-
-            orig_vs_copy_cm = confusion_metrics(orig_vs_copy, orig_vs_third)
-            orig_vs_snr_1000_cm = confusion_metrics(orig_vs_snr_1000, orig_vs_third)
-            orig_vs_snr_100_cm = confusion_metrics(orig_vs_snr_100, orig_vs_third)
-            orig_vs_snr_10_cm = confusion_metrics(orig_vs_snr_10, orig_vs_third)
-            orig_vs_retrained_cm = confusion_metrics(orig_vs_retrained, orig_vs_third)
-            orig_vs_third_cm = confusion_metrics_multi(orig_vs_third, orig_vs_copy, orig_vs_snr_1000, orig_vs_snr_100, orig_vs_snr_10, orig_vs_retrained)
-
-            print(f"Original vs. Copy            : {result_to_str(orig_vs_copy)     } (tpr, tnr, fpr, fnr)={tuple_to_str(orig_vs_copy_cm)}")
-            print(f"Original vs. Noisy (SNR=1000): {result_to_str(orig_vs_snr_1000) } (tpr, tnr, fpr, fnr)={tuple_to_str(orig_vs_snr_1000_cm)}")
-            print(f"Original vs. Noisy (SNR=100) : {result_to_str(orig_vs_snr_100)  } (tpr, tnr, fpr, fnr)={tuple_to_str(orig_vs_snr_100_cm)}")
-            print(f"Original vs. Noisy (SNR=10)  : {result_to_str(orig_vs_snr_10)   } (tpr, tnr, fpr, fnr)={tuple_to_str(orig_vs_snr_10_cm)}")
-            print(f"Original vs. Retrained       : {result_to_str(orig_vs_retrained)} (tpr, tnr, fpr, fnr)={tuple_to_str(orig_vs_retrained_cm)}")
-            print(f"Original vs. 3rd-party       : {result_to_str(orig_vs_third)    } (tpr, tnr, fpr, fnr)={tuple_to_str(orig_vs_third_cm)}")
+            print(f"Original vs. third: {stats_to_str(orig_vs_third)}")
             
-            simple_results[a]["copy"][c][d] = orig_vs_copy_cm
-            simple_results[a]["snr-1000"][c][d] = orig_vs_snr_1000_cm
-            simple_results[a]["snr-100"][c][d] = orig_vs_snr_100_cm
-            simple_results[a]["snr-10"][c][d] = orig_vs_snr_10_cm
-            simple_results[a]["retrained"][c][d] = orig_vs_retrained_cm
-            simple_results[a]["third"][c][d] = orig_vs_third_cm
+            for e in filter(lambda x: x != "third", extraction_methods):
+                orig_vs_suspect = results[a][e][c][d]
+                orig_vs_suspect_cm = confusion_metrics(orig_vs_suspect, orig_vs_third)
+                
+                print(f"Original vs. {e}: {stats_to_str(orig_vs_suspect)} (tpr, tnr, fpr, fnr)={tuple_to_str(orig_vs_suspect_cm)}")
 
 
 for a in query_types:
     for d in output_filters:
-        for e in extraction_methods:
-            class_prediction_cm = simple_results[a][e]["class_prediction"][d]
-            logit_cm = simple_results[a][e]["logit"][d]
-            trace_overlap_cm = simple_results[a][e]["trace_overlap"][d]
-
-            accuracy_class_prediction = cm_to_accuracy(*class_prediction_cm)
-            accuracy_logit = cm_to_accuracy(*logit_cm)
-
-            f1_class_prediction = cm_to_f1_score(*class_prediction_cm)
-            f1_logit = cm_to_f1_score(*logit_cm)
+        print()
+        print(f"query_type: {a}, output_filter: {d}")
             
-            hybrid_methods = {"AND": confusion_metrics_and,
-                              "OR" : confusion_metrics_or}
-            
-            for m, merge_cm in hybrid_methods.items():
-                print()
-                print(f"query_type: {a}, output_filter: {d}, extraction_method: {e}, hybrid method: {m}")
+        orig_vs_third_prediction = results[a]["third"]["class_prediction"][d]
+        orig_vs_third_logit = results[a]["third"]["logit"][d]
+        orig_vs_third_trace = results[a]["third"]["trace_overlap"][d]
 
-                hybrid1_cm = merge_cm(class_prediction_cm, trace_overlap_cm)
-                hybrid2_cm = merge_cm(logit_cm, trace_overlap_cm)
-                
-                accuracy_hybrid1 = cm_to_accuracy(*hybrid1_cm)
-                accuracy_hybrid2 = cm_to_accuracy(*hybrid2_cm)
+        for e in filter(lambda x: x != "third", extraction_methods):
+            orig_vs_suspect_prediction = results[a][e]["class_prediction"][d]
+            orig_vs_suspect_logit = results[a][e]["logit"][d]
+            orig_vs_suspect_trace = results[a][e]["trace_overlap"][d]
 
-                f1_hybrid1 = cm_to_f1_score(*hybrid1_cm)
-                f1_hybrid2 = cm_to_f1_score(*hybrid2_cm)            
-                
-                improvement1 = (f1_hybrid1 - f1_class_prediction) / f1_class_prediction
-                improvement2 = (f1_hybrid2 - f1_logit) / f1_logit
-                
-                print(f"class_prediction                       : accuracy={f1_class_prediction:.4f}")
-                print(f"Hybrid class_prediction + trace_overlap: accuracy={f1_hybrid1:.4f}")
-                print(f"                                      improvement={improvement1:.4f}")
-                print(f"logit                                  : accuracy={f1_logit:.4f}")
-                print(f"Hybrid logit            + trace_overlap: accuracy={f1_hybrid2:.4f}")
-                print(f"                                      improvement={improvement2:.4f}")
+            orig_vs_suspect_prediction_cm = confusion_metrics(orig_vs_suspect_prediction, orig_vs_third_prediction)
+            orig_vs_suspect_logit_cm = confusion_metrics(orig_vs_suspect_logit, orig_vs_third_logit)
+            orig_vs_suspect_trace_cm = confusion_metrics(orig_vs_suspect_trace, orig_vs_third_trace)
 
+            hybrid_prediction_and_trace_cm = confusion_metrics_joint([orig_vs_suspect_prediction, orig_vs_suspect_trace],
+                                                                     [orig_vs_third_prediction, orig_vs_third_trace])
+            hybrid_logit_and_trace_cm = confusion_metrics_joint([orig_vs_suspect_logit, orig_vs_suspect_trace],
+                                                                [orig_vs_third_logit, orig_vs_third_trace])
+
+            hybrid_prediction_and_trace_improvement = cm_improvement(orig_vs_suspect_prediction_cm, hybrid_prediction_and_trace_cm)
+            hybrid_logit_and_trace_improvement = cm_improvement(orig_vs_suspect_logit_cm, hybrid_logit_and_trace_cm)
+
+            print(f"(Hybrid prection + trace) Original vs. {e}: (tpr, tnr, fpr, fnr)={tuple_to_str(hybrid_prediction_and_trace_cm)} improvement={tuple_to_str(hybrid_prediction_and_trace_improvement)}")
+            print(f"(Hybrid logit + trace) Original vs. {e}   : (tpr, tnr, fpr, fnr)={tuple_to_str(hybrid_logit_and_trace_cm)} improvement={tuple_to_str(hybrid_logit_and_trace_improvement)}")
             
