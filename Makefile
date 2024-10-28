@@ -1,3 +1,26 @@
+# MIT License
+
+# Copyright (c) 2024 Can Aknesil
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
 # This makefile is not used for building. It prints information about
 # the available scripts and their usage.
 
@@ -115,11 +138,7 @@ verify_inference:
 	$(call command,ipython tf/infer-model-and-compare.py $(W)/$(MODEL).tflite $(W)/$(INPUTS) $(W)/$(OUTPUTS))
 
 
-compare_models:
-	$(call print_target_info,$(W)/$(ORIGINAL)_outputs.npy $(W)/$(ORIGINAL)_traces.npy $(W)/$(SUSPECT)_outputs.npy $(W)/$(SUSPECT)_traces.npy $(W)/$(Y_TEST),,ORIGINAL SUSPECT Y_TEST)
-	$(call command,ipython sca/compare_models.py $(W)/$(ORIGINAL) $(W)/$(SUSPECT) $(W)/$(Y_TEST))
+analysis_top:
+	$(call command,ipython sca/analysis-top.py)
 
 
-detect_stolen:
-	$(call print_target_info,$(W)/$(ORIGINAL)_outputs.npy $(W)/$(SUSPECT)_outputs.npy $(W)/$(THIRD)_outputs.npy $(W)/$(Y_TEST),,ORIGINAL SUSPECT THIRD Y_TEST)
-	$(call command,ipython sca/detect-stolen-model.py $(W)/$(ORIGINAL) $(W)/$(SUSPECT) $(W)/$(THIRD) $(W)/$(Y_TEST))
