@@ -1,0 +1,36 @@
+query_type: regular, metric_type: class_prediction, output_filter: none
+Original vs. third: 0.9337 +- 0.0093 (out of 22)
+Original vs. copy: 1.0000 +- 0.0000 (out of 24) (sen: nan, spc: nan, ba: nan)
+Original vs. snr-1000: 0.9994 +- 0.0005 (out of 24) (sen: 1.0000, spc: 1.0000, ba: 1.0000)
+Original vs. snr-100: 0.9940 +- 0.0020 (out of 24) (sen: 1.0000, spc: 1.0000, ba: 1.0000)
+Original vs. snr-10: 0.9384 +- 0.0173 (out of 24) (sen: 0.5741, spc: 0.7659, ba: 0.6700)
+Original vs. retrained: 0.9627 +- 0.0095 (out of 24) (sen: 0.8789, spc: 0.9261, ba: 0.9025)
+
+query_type: regular, metric_type: logit, output_filter: none
+Original vs. third: 0.9199 +- 0.0103 (out of 22)
+Original vs. copy: 1.0000 +- 0.0000 (out of 24) (sen: nan, spc: nan, ba: nan)
+Original vs. snr-1000: 0.9994 +- 0.0001 (out of 24) (sen: 1.0000, spc: 1.0000, ba: 1.0000)
+Original vs. snr-100: 0.9934 +- 0.0012 (out of 24) (sen: 1.0000, spc: 1.0000, ba: 1.0000)
+Original vs. snr-10: 0.9273 +- 0.0192 (out of 24) (sen: 0.5822, spc: 0.8180, ba: 0.7001)
+Original vs. retrained: 0.9539 +- 0.0103 (out of 24) (sen: 0.9363, spc: 0.9169, ba: 0.9266)
+
+query_type: regular, metric_type: trace_overlap, output_filter: none
+Original vs. third: 0.9443 +- 0.0031 (out of 22)
+Original vs. copy: 0.9641 +- 0.0016 (out of 24) (sen: 1.0000, spc: 1.0000, ba: 1.0000)
+Original vs. snr-1000: 0.9625 +- 0.0021 (out of 24) (sen: 0.9998, spc: 0.9997, ba: 0.9997)
+Original vs. snr-100: 0.9613 +- 0.0021 (out of 24) (sen: 0.9997, spc: 0.9996, ba: 0.9997)
+Original vs. snr-10: 0.9565 +- 0.0050 (out of 24) (sen: 0.8501, spc: 0.9759, ba: 0.9130)
+Original vs. retrained: 0.9491 +- 0.0039 (out of 24) (sen: 0.7082, spc: 0.7016, ba: 0.7049)
+Confusion metrics for hybrid methods:
+
+query_type: regular, output_filter: none
+(Hybrid prection + trace) Original vs. copy: (sen: nan, spc: nan, ba: nan) improvement=(sen: nan, spc: nan, ba: nan)
+(Hybrid logit + trace) Original vs. copy   : (sen: nan, spc: nan, ba: nan) improvement=(sen: nan, spc: nan, ba: nan)
+(Hybrid prection + trace) Original vs. snr-1000: (sen: 1.0000, spc: 1.0000, ba: 1.0000) improvement=(sen: -0.0000, spc: -0.0000, ba: -0.0000)
+(Hybrid logit + trace) Original vs. snr-1000   : (sen: 0.9984, spc: 1.0000, ba: 0.9992) improvement=(sen: -0.0016, spc: -0.0000, ba: -0.0008)
+(Hybrid prection + trace) Original vs. snr-100: (sen: 1.0000, spc: 1.0000, ba: 1.0000) improvement=(sen: -0.0000, spc: -0.0000, ba: -0.0000)
+(Hybrid logit + trace) Original vs. snr-100   : (sen: 1.0000, spc: 1.0000, ba: 1.0000) improvement=(sen: -0.0000, spc: -0.0000, ba: -0.0000)
+(Hybrid prection + trace) Original vs. snr-10: (sen: 0.8831, spc: 0.9746, ba: 0.9289) improvement=(sen: 0.3090, spc: 0.2087, ba: 0.2589)
+(Hybrid logit + trace) Original vs. snr-10   : (sen: 0.8874, spc: 0.9757, ba: 0.9315) improvement=(sen: 0.3051, spc: 0.1577, ba: 0.2314)
+(Hybrid prection + trace) Original vs. retrained: (sen: 0.8925, spc: 0.9359, ba: 0.9142) improvement=(sen: 0.0135, spc: 0.0098, ba: 0.0117)
+(Hybrid logit + trace) Original vs. retrained   : (sen: 0.9330, spc: 0.9194, ba: 0.9262) improvement=(sen: -0.0033, spc: 0.0026, ba: -0.0004)

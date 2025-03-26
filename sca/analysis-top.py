@@ -33,6 +33,7 @@ import scipy.stats as st
 import math
 import copy
 from functools import reduce
+from pprint import pprint
 
 
 #
@@ -53,20 +54,19 @@ def ls_re(pattern):
     return sorted(items, key=natural_sort_key)
 
 
-models = ls_re("^mnist_7x7_indep-\d+_init-\d+$")
+models = ls_re(r"^mnist_7x7_indep-\d+_init-\d+$")
 
 # There is actually no model whose name ends with "_copy" because they
 # would be the same as their equivalent, without the "_copy"
 # postfix. However, a second set of traces are collected for these
 # models. The name of the trace files end with "_copy_traces.npy".
-# models_copy = list(map(lambda s: s + "_copy", models))
 models_copy1 = list(map(lambda s: s + "_copy1", models))
 models_copy2 = list(map(lambda s: s + "_copy2", models))
 
-models_snr_1000 = ls_re("^mnist_7x7_indep-\d+_init-\d+_snr-1000$")
-models_snr_100 = ls_re("^mnist_7x7_indep-\d+_init-\d+_snr-100$")
-models_snr_10 = ls_re("^mnist_7x7_indep-\d+_init-\d+_snr-10$")
-models_retrained = ls_re("^mnist_7x7_indep-\d+_init-\d+_retrained_ds-\d+_init-\d+$")
+models_snr_1000 = ls_re(r"^mnist_7x7_indep-\d+_init-\d+_snr-1000$")
+models_snr_100 = ls_re(r"^mnist_7x7_indep-\d+_init-\d+_snr-100$")
+models_snr_10 = ls_re(r"^mnist_7x7_indep-\d+_init-\d+_snr-10$")
+models_retrained = ls_re(r"^mnist_7x7_indep-\d+_init-\d+_retrained_ds-\d+_init-\d+$")
 
 
 def print_models(info, models):
@@ -75,9 +75,11 @@ def print_models(info, models):
         print("  ", end="")
         print(m)
 
+def print_list(info, lst):
+    print_models(info, lst)
+
 
 print_models("models", models)
-#print_models("models_copy", models_copy)
 print_models("models_copy1", models_copy1)
 print_models("models_copy2", models_copy2)
 print_models("models_snr_1000", models_snr_1000)
@@ -86,13 +88,22 @@ print_models("models_snr_10", models_snr_10)
 print_models("models_retrained", models_retrained)
 
 print()
-correct_outputs = workspace + "/mnist_7x7_indep-0_y_test.npy"
-print("Correct outputs:", correct_outputs)
-correct_outputs = np.load(correct_outputs)
+correct_outputs_regular = [workspace + "/mnist_7x7_indep-0_y_test.npy"] * len(models)
+all_train_y = ls_re(r"mnist_7x7_indep-\d+_y_train.npy$")
+all_train_y = list(map(lambda f: workspace + "/" + f, all_train_y))
+correct_outputs_training = list(reduce(lambda a, b: a + b, map(lambda i: [i, i], all_train_y)))
+correct_outputs_training_retrained = list(reduce(lambda a, b: a + b, map(lambda i: [i] * 4, all_train_y[::2])))
+
+print_list("Correct outputs for regular queries", correct_outputs_regular)
+print_list("Correct outputs for queries from training set", correct_outputs_training)
+print_list("Correct outputs for queries from training set for retrained models", correct_outputs_training_retrained)
+
+correct_outputs_regular = list(map(np.load, correct_outputs_regular))
+correct_outputs_training = list(map(np.load, correct_outputs_training))
 
 print()
-#pairs_copy = list(zip(models, models_copy))
-pairs_copy = list(zip(models_copy1, models_copy2))
+pairs_copy = list(zip(models, models_copy1))
+#pairs_copy = list(zip(models_copy1, models_copy2))
 pairs_snr_1000 = list(zip(models, models_snr_1000))
 pairs_snr_100 = list(zip(models, models_snr_100))
 pairs_snr_10 = list(zip(models, models_snr_10))
@@ -134,15 +145,23 @@ if debug:
 #
 
 # Inputs that is provided to the model during inference. "regular"
-# inputs are similar to the ones the models is trained with. "random"
-# inputs are generated randomly and doesn't have a corresponding
-# label.
-#query_types = ["regular", "random"]
-query_types = ["regular"]
+# inputs are similar to the ones the models is trained with but they
+# are not from the training dataset. A typical testing dataset is in
+# this category. "random" inputs are generated randomly and doesn't
+# have a corresponding label. "training" is samples taken from the
+# training dataset of the original model.
+
+# Execute analysis for individual query types as the traces won't fit
+# into memory. Using single query type uses 14.3 GB memory.
+
+#query_types = ["random"] # Traces have not been collected for random inputs yet.
+#query_types = ["regular"]
+query_types = ["training"]
 
 extraction_methods = ["copy", "snr-1000", "snr-100", "snr-10", "retrained", "third"]
 
-# Information whose similarity between the original and the suspect model will be analyzed.
+# Information whose similarity between the original and the suspect
+# model that will be analyzed.
 metric_types = ["class_prediction", "logit", "trace_overlap"]
 
 # The method used to calculate overlap between probability
@@ -207,26 +226,41 @@ for extraction_method in extraction_methods:
         model_pairs = model_pairs_dict[extraction_method]
 
         print("Comparing models:")
-        for m1, m2 in model_pairs:
+        for i in range(len(model_pairs)):
+            m1, m2 = model_pairs[i]
             print(f"  ({m1}, {m2})")
 
             # Load outputs and traces
             prefix1 = workspace + "/" + m1
             prefix2 = workspace + "/" + m2
-            if query_type == "random":
+
+            if query_type == "regular":
+                pass
+            elif query_type == "random":
                 prefix1 += "_rand-x"
                 prefix2 += "_rand-x"
+            elif query_type == "training":
+                prefix1 += "_on-x-train"
+                prefix2 += "_on-x-train"
 
             m1_outputs, m1_traces = load_data(prefix1)
             m2_outputs, m2_traces = load_data(prefix2)
-            
-            if query_type == "random":
-                m1 += "_rand-x"
-                corr_outputs = None
-            elif "when_orig_wrong" not in output_filters:
-                corr_outputs = None
+
+            if output_filters == "when_orig_wrong":
+                if query_type == "random":
+                    corr_outputs = None
+                elif query_type == "regular":
+                    corr_outputs = correct_outputs_regular
+                elif query_type == "training":
+                    if extraction_method == "retrained":
+                        corr_outputs = correct_outputs_training_retrained
+                    else:
+                        corr_outputs = correct_outputs_training
             else:
-                corr_outputs = correct_outputs
+                corr_outputs = None
+
+            if corr_outputs is not None:
+                corr_outputs = corr_outputs[i]
                 
             res = compare_model_outputs(m1_outputs, m2_outputs, corr_outputs)
             results[query_type][extraction_method]["class_prediction"]["none"].append(res["class_predictions"])
@@ -244,7 +278,8 @@ for extraction_method in extraction_methods:
 
 
 print("\nResults:")
-print(results)
+#print(results)
+pprint(results)
                 
 results_file = workspace + "/analysis-results"
 print("Writing results to " + results_file)
@@ -445,15 +480,15 @@ def stats_to_str(r):
     return f"{mean:.4f} +- {std:.4f} (out of {size})"
 
 
-def tuple_to_str(r):
-    if len(r) == 0:
-        return "()"
-    
-    s = "("
-    s += f"{r[0]:.4f}"
-    for x in r[1:]:
-        s += f" {x:.4f}"
-    s += ")"
+def cm_to_str(cm):
+    assert len(cm) == 4
+    tpr, tnr, fpr, fnr = cm
+    sen = tpr
+    spc = tnr
+    ba = (tpr + tnr) / 2
+
+    s = f"(sen: {sen:.4f}, spc: {spc:.4f}, ba: {ba:.4f})"
+
     return s
 
 
@@ -463,6 +498,7 @@ def cm_improvement(cm1, cm2):
     return (y - x)
 
 
+print("Original model's similarity to the clones and independent models (PDF overlap and confusion metrics) :")
 for a in query_types:
     for c in metric_types:
         for d in output_filters:
@@ -476,9 +512,10 @@ for a in query_types:
                 orig_vs_suspect = results[a][e][c][d]
                 orig_vs_suspect_cm = confusion_metrics(orig_vs_suspect, orig_vs_third)
                 
-                print(f"Original vs. {e}: {stats_to_str(orig_vs_suspect)} (tpr, tnr, fpr, fnr)={tuple_to_str(orig_vs_suspect_cm)}")
+                print(f"Original vs. {e}: {stats_to_str(orig_vs_suspect)} {cm_to_str(orig_vs_suspect_cm)}")
 
 
+print("Confusion metrics for hybrid methods:")
 for a in query_types:
     for d in output_filters:
         print()
@@ -505,6 +542,6 @@ for a in query_types:
             hybrid_prediction_and_trace_improvement = cm_improvement(orig_vs_suspect_prediction_cm, hybrid_prediction_and_trace_cm)
             hybrid_logit_and_trace_improvement = cm_improvement(orig_vs_suspect_logit_cm, hybrid_logit_and_trace_cm)
 
-            print(f"(Hybrid prection + trace) Original vs. {e}: (tpr, tnr, fpr, fnr)={tuple_to_str(hybrid_prediction_and_trace_cm)} improvement={tuple_to_str(hybrid_prediction_and_trace_improvement)}")
-            print(f"(Hybrid logit + trace) Original vs. {e}   : (tpr, tnr, fpr, fnr)={tuple_to_str(hybrid_logit_and_trace_cm)} improvement={tuple_to_str(hybrid_logit_and_trace_improvement)}")
+            print(f"(Hybrid prection + trace) Original vs. {e}: {cm_to_str(hybrid_prediction_and_trace_cm)} improvement={cm_to_str(hybrid_prediction_and_trace_improvement)}")
+            print(f"(Hybrid logit + trace) Original vs. {e}   : {cm_to_str(hybrid_logit_and_trace_cm)} improvement={cm_to_str(hybrid_logit_and_trace_improvement)}")
             
