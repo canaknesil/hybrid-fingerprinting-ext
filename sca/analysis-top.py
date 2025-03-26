@@ -154,11 +154,15 @@ if debug:
 # Execute analysis for individual query types as the traces won't fit
 # into memory. Using single query type uses 14.3 GB memory.
 
-#query_types = ["random"] # Traces have not been collected for random inputs yet.
+query_types = ["random"]
 #query_types = ["regular"]
-query_types = ["training"]
+#query_types = ["training"]
 
-extraction_methods = ["copy", "snr-1000", "snr-100", "snr-10", "retrained", "third"]
+#extraction_methods = ["copy", "snr-1000", "snr-100", "snr-10", "retrained", "third"]
+extraction_methods = ["snr-1000", "snr-100", "snr-10", "retrained", "third"]
+
+#model_pairs_dict = dict(zip(extraction_methods, [pairs_copy, pairs_snr_1000, pairs_snr_100, pairs_snr_10, pairs_retrained, pairs_third]))
+model_pairs_dict = dict(zip(extraction_methods, [pairs_snr_1000, pairs_snr_100, pairs_snr_10, pairs_retrained, pairs_third]))
 
 # Information whose similarity between the original and the suspect
 # model that will be analyzed.
@@ -175,7 +179,8 @@ metric_types = ["class_prediction", "logit", "trace_overlap"]
 # The filtering that will be applied to the above
 # information. "when_orig_wrong" compares only the cases where the
 # original model's predictions are wrong.
-#output_filters = ["none", "when_orig_wrong"]
+
+#output_filters = ["none", "when_orig_wrong"] # "when_orig_wrong" is currently buggy
 output_filters = ["none"]
 
 
@@ -215,7 +220,6 @@ def load_data_from_disk(prefix):
 
 
 results = init_results([query_types, extraction_methods, metric_types, output_filters])
-model_pairs_dict = dict(zip(extraction_methods, [pairs_copy, pairs_snr_1000, pairs_snr_100, pairs_snr_10, pairs_retrained, pairs_third]))
 
 for extraction_method in extraction_methods:
     
