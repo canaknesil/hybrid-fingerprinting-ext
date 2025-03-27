@@ -93,6 +93,7 @@ all_train_y = ls_re(r"mnist_7x7_indep-\d+_y_train.npy$")
 all_train_y = list(map(lambda f: workspace + "/" + f, all_train_y))
 correct_outputs_training = list(reduce(lambda a, b: a + b, map(lambda i: [i, i], all_train_y)))
 correct_outputs_training_retrained = list(reduce(lambda a, b: a + b, map(lambda i: [i] * 4, all_train_y[::2])))
+correct_outputs_training_fixed = [workspace + "/mnist_7x7_indep-0_y_test.npy"] * (len(models) - 2) # Used for comparing with third party models
 
 print_list("Correct outputs for regular queries", correct_outputs_regular)
 print_list("Correct outputs for queries from training set", correct_outputs_training)
@@ -100,6 +101,7 @@ print_list("Correct outputs for queries from training set for retrained models",
 
 correct_outputs_regular = list(map(np.load, correct_outputs_regular))
 correct_outputs_training = list(map(np.load, correct_outputs_training))
+correct_outputs_training_fixed = list(map(np.load, correct_outputs_training_fixed))
 
 print()
 pairs_copy = list(zip(models, models_copy1))
@@ -159,10 +161,8 @@ query_types = ["random"]
 #query_types = ["training"]
 
 extraction_methods = ["copy", "snr-1000", "snr-100", "snr-10", "retrained", "third"]
-#extraction_methods = ["snr-1000", "snr-100", "snr-10", "retrained", "third"]
 
 model_pairs_dict = dict(zip(extraction_methods, [pairs_copy, pairs_snr_1000, pairs_snr_100, pairs_snr_10, pairs_retrained, pairs_third]))
-#model_pairs_dict = dict(zip(extraction_methods, [pairs_snr_1000, pairs_snr_100, pairs_snr_10, pairs_retrained, pairs_third]))
 
 # Information whose similarity between the original and the suspect
 # model that will be analyzed.
@@ -244,8 +244,12 @@ for extraction_method in extraction_methods:
                 prefix1 += "_rand-x"
                 prefix2 += "_rand-x"
             elif query_type == "training":
-                prefix1 += "_on-x-train"
-                prefix2 += "_on-x-train"
+                if extraction_method == "third":
+                    prefix1 += "_on-same-x-train"
+                    prefix2 += "_on-same-x-train"
+                else:
+                    prefix1 += "_on-x-train"
+                    prefix2 += "_on-x-train"
 
             m1_outputs, m1_traces = load_data(prefix1)
             m2_outputs, m2_traces = load_data(prefix2)
@@ -258,6 +262,8 @@ for extraction_method in extraction_methods:
                 elif query_type == "training":
                     if extraction_method == "retrained":
                         corr_outputs = correct_outputs_training_retrained
+                    elif extraction_method == "third":
+                        corr_outputs = correct_outputs_training_fixed
                     else:
                         corr_outputs = correct_outputs_training
             else:

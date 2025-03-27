@@ -1,0 +1,38 @@
+Original model's similarity to the clones and independent models (PDF overlap and confusion metrics) :
+
+query_type: training, metric_type: class_prediction, output_filter: none
+Original vs. third: 0.9390 +- 0.0086 (out of 22)
+Original vs. copy: 1.0000 +- 0.0000 (out of 24) (sen: nan, spc: nan, ba: nan)
+Original vs. snr-1000: 0.9995 +- 0.0005 (out of 24) (sen: 1.0000, spc: 1.0000, ba: 1.0000)
+Original vs. snr-100: 0.9948 +- 0.0020 (out of 24) (sen: 1.0000, spc: 1.0000, ba: 1.0000)
+Original vs. snr-10: 0.9359 +- 0.0194 (out of 24) (sen: 0.4638, spc: 0.7991, ba: 0.6314)
+Original vs. retrained: 0.9633 +- 0.0082 (out of 24) (sen: 0.8583, spc: 0.9162, ba: 0.8872)
+
+query_type: training, metric_type: logit, output_filter: none
+Original vs. third: 0.9202 +- 0.0101 (out of 22)
+Original vs. copy: 1.0000 +- 0.0000 (out of 24) (sen: nan, spc: nan, ba: nan)
+Original vs. snr-1000: 0.9994 +- 0.0001 (out of 24) (sen: 1.0000, spc: 1.0000, ba: 1.0000)
+Original vs. snr-100: 0.9934 +- 0.0013 (out of 24) (sen: 1.0000, spc: 1.0000, ba: 1.0000)
+Original vs. snr-10: 0.9267 +- 0.0198 (out of 24) (sen: 0.5651, spc: 0.8301, ba: 0.6976)
+Original vs. retrained: 0.9534 +- 0.0107 (out of 24) (sen: 0.9173, spc: 0.9156, ba: 0.9164)
+
+query_type: training, metric_type: trace_overlap, output_filter: none
+Original vs. third: 0.9459 +- 0.0022 (out of 22)
+Original vs. copy: 0.9651 +- 0.0016 (out of 24) (sen: 1.0000, spc: 1.0000, ba: 1.0000)
+Original vs. snr-1000: 0.9613 +- 0.0030 (out of 24) (sen: 0.9965, spc: 0.9971, ba: 0.9968)
+Original vs. snr-100: 0.9597 +- 0.0029 (out of 24) (sen: 0.9714, spc: 0.9903, ba: 0.9808)
+Original vs. snr-10: 0.9557 +- 0.0044 (out of 24) (sen: 0.8451, spc: 0.9570, ba: 0.9010)
+Original vs. retrained: 0.9486 +- 0.0035 (out of 24) (sen: 0.6107, spc: 0.7325, ba: 0.6716)
+Confusion metrics for hybrid methods:
+
+query_type: training, output_filter: none
+(Hybrid prection + trace) Original vs. copy: (sen: nan, spc: nan, ba: nan) improvement=(sen: nan, spc: nan, ba: nan)
+(Hybrid logit + trace) Original vs. copy   : (sen: nan, spc: nan, ba: nan) improvement=(sen: nan, spc: nan, ba: nan)
+(Hybrid prection + trace) Original vs. snr-1000: (sen: 0.9999, spc: 1.0000, ba: 1.0000) improvement=(sen: -0.0001, spc: -0.0000, ba: -0.0000)
+(Hybrid logit + trace) Original vs. snr-1000   : (sen: 0.9982, spc: 1.0000, ba: 0.9991) improvement=(sen: -0.0018, spc: -0.0000, ba: -0.0009)
+(Hybrid prection + trace) Original vs. snr-100: (sen: 0.9998, spc: 1.0000, ba: 0.9999) improvement=(sen: -0.0002, spc: -0.0000, ba: -0.0001)
+(Hybrid logit + trace) Original vs. snr-100   : (sen: 0.9998, spc: 1.0000, ba: 0.9999) improvement=(sen: -0.0002, spc: -0.0000, ba: -0.0001)
+(Hybrid prection + trace) Original vs. snr-10: (sen: 0.8950, spc: 0.9647, ba: 0.9298) improvement=(sen: 0.4312, spc: 0.1656, ba: 0.2984)
+(Hybrid logit + trace) Original vs. snr-10   : (sen: 0.8888, spc: 0.9664, ba: 0.9276) improvement=(sen: 0.3237, spc: 0.1362, ba: 0.2300)
+(Hybrid prection + trace) Original vs. retrained: (sen: 0.8901, spc: 0.9299, ba: 0.9100) improvement=(sen: 0.0318, spc: 0.0137, ba: 0.0227)
+(Hybrid logit + trace) Original vs. retrained   : (sen: 0.9130, spc: 0.9356, ba: 0.9243) improvement=(sen: -0.0043, spc: 0.0200, ba: 0.0079)
